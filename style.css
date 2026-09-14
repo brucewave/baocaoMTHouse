@@ -1,0 +1,22 @@
+/*
+Theme Name: MT HOUSE — Báo cáo công việc
+Theme URI: https://github.com/brucewave/baocaoMTHouse
+Author: MT House
+Author URI: https://mthouse.vn
+Description: Hệ thống báo cáo công việc nội bộ cho công ty thiết kế nội thất, kiến trúc và xây dựng MT House. Nhân viên gửi báo cáo hằng ngày kèm hình ảnh, quản lý duyệt và xem báo cáo tổng hợp theo tháng; kèm hành trình khách hàng 6 bước có lịch nhắc và ghi chú. Chạy hoàn toàn bằng tệp tĩnh, không thư viện ngoài.
+Version: 1.0.0
+Requires at least: 6.0
+Tested up to: 6.8
+Requires PHP: 7.4
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: mthouse-baocao
+Tags: full-width-template, custom-logo, translation-ready
+
+LƯU Ý: đây chỉ là phần khai báo để WordPress nhận diện theme.
+Toàn bộ giao diện nằm ở css/app.css.
+
+Theme này chiếm trọn trang, không dùng header/footer của WordPress, nên chỉ
+nên kích hoạt trên một site hoặc subdomain riêng dành cho công cụ báo cáo
+(ví dụ baocao.mthouse.vn). Không kích hoạt trên site giới thiệu công ty.
+*/

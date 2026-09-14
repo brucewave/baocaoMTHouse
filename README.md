@@ -10,11 +10,41 @@ lại vào Excel).
 
 Nhấp đúp vào tệp `index.html`. Không cần cài đặt gì thêm, không cần mạng.
 
-Muốn cả công ty mở được bằng đường link thì bật **GitHub Pages**: vào repo trên GitHub →
-*Settings* → *Pages* → chọn nhánh `main`, thư mục `/ (root)* → Save. Sau khoảng một phút sẽ
-có địa chỉ dạng `https://<tên-tài-khoản>.github.io/<tên-repo>/`. Toàn bộ dự án là tệp tĩnh
-nên không cần cấu hình gì thêm — nhưng nhớ rằng **mỗi người mở link sẽ có dữ liệu riêng trên
-máy của họ** (xem mục 4).
+### Cài lên WordPress
+
+Dự án này **đồng thời là một theme WordPress**. Tệp cài sẵn có trong repo:
+`mthouse-baocao.zip`.
+
+1. Vào **Bảng điều khiển → Giao diện → Thêm mới → Tải giao diện lên**
+2. Chọn `mthouse-baocao.zip` → *Cài đặt ngay* → *Kích hoạt*
+
+> ⚠️ **Chỉ kích hoạt trên một site hoặc subdomain riêng** dành cho công cụ báo cáo, ví dụ
+> `baocao.mthouse.vn`. Theme này chiếm trọn trang chủ, nên nếu kích hoạt trên chính
+> `mthouse.vn` thì trang giới thiệu công ty sẽ bị thay bằng màn hình báo cáo.
+> Muốn dùng chung trên site hiện tại thì cần đóng thành **plugin** thay vì theme.
+
+Tuỳ chọn — **bắt đăng nhập WordPress** trước khi vào trang báo cáo. Thêm dòng này vào
+`wp-config.php`:
+
+```php
+define( 'MTH_BAOCAO_REQUIRE_LOGIN', true );
+```
+
+Mặc định tắt, vì dữ liệu nằm trong trình duyệt của từng người chứ không nằm trên máy chủ —
+người lạ mở vào chỉ thấy dữ liệu mẫu của chính họ, không thấy gì của công ty. Bật lên thì
+mỗi nhân viên cần một tài khoản WordPress.
+
+Theme đã tự đặt `noindex` để Google không lập chỉ mục, ẩn thanh quản trị ở mặt trước, và
+dùng `filemtime()` làm số phiên bản cho CSS/JS nên mỗi lần cập nhật là trình duyệt tải lại
+ngay, không phải xoá cache.
+
+### Cài lên GitHub Pages
+
+Cách nhanh nhất nếu chưa cần WordPress: vào repo trên GitHub → *Settings* → *Pages* → chọn
+nhánh `main`, thư mục `/ (root)` → Save. Sau khoảng một phút sẽ có địa chỉ dạng
+`https://<tên-tài-khoản>.github.io/<tên-repo>/`. Toàn bộ dự án là tệp tĩnh nên không cần
+cấu hình gì thêm — nhưng nhớ rằng **mỗi người mở link sẽ có dữ liệu riêng trên máy của họ**
+(xem mục 4).
 
 Đăng nhập bằng **tên đăng nhập** và **mật khẩu**. Tài khoản có sẵn khi mở lần đầu:
 
@@ -249,7 +279,12 @@ một lớp bảo mật.
 
 ```
 BaoCaoMTHouse/
-├── index.html          khung trang
+├── index.html          khung trang khi chạy độc lập (nhấp đúp là mở)
+├── index.php           khung trang khi chạy trong WordPress
+├── style.css           phần khai báo theme cho WordPress (không chứa giao diện)
+├── functions.php       nạp CSS/JS, chỉ đường thư mục ảnh, tuỳ chọn bắt đăng nhập
+├── screenshot.png      ảnh đại diện theme trong trang Giao diện
+├── mthouse-baocao.zip  gói cài sẵn, tải thẳng lên WordPress
 ├── assets/
 │   ├── logo.png        logo vuông — dùng cho trang đăng nhập và favicon
 │   └── logo-wide.png   logo ngang — dùng cho thanh trên cùng

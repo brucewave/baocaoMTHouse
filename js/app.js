@@ -12,6 +12,10 @@
     objectUrls: []
   };
 
+  /* Thư mục ảnh. Chạy độc lập thì là 'assets/'; khi làm theme WordPress,
+     functions.php gán window.MTH_ASSETS thành đường dẫn đầy đủ của theme. */
+  var ASSETS = window.MTH_ASSETS || 'assets/';
+
   var STATUS = {
     pending:  { label: 'Chờ duyệt', icon: 'clock',       cls: 'badge-pending' },
     approved: { label: 'Đã duyệt',  icon: 'checkCircle', cls: 'badge-approved' },
@@ -133,7 +137,7 @@
 
         '<div class="login-card">' +
         '<div class="login-brand">' +
-          '<img src="assets/logo.png" alt="Logo MT House" width="480" height="350">' +
+          '<img src="' + ASSETS + 'logo.png" alt="Logo MT House" width="480" height="350">' +
           '<h1>Hệ thống báo cáo công việc</h1>' +
         '</div>' +
 
@@ -296,7 +300,7 @@
     app.innerHTML =
       '<div class="shell">' +
         '<header class="topbar">' +
-          '<span class="brand-chip"><img src="assets/logo-wide.png" alt="MT House" width="503" height="139"></span>' +
+          '<span class="brand-chip"><img src="' + ASSETS + 'logo-wide.png" alt="MT House" width="503" height="139"></span>' +
           '<div class="topbar-title">Hệ thống báo cáo công việc</div>' +
           '<div class="topbar-spacer"></div>' +
           '<button class="topbar-user" id="btn-account" type="button" ' +
