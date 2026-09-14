@@ -1,0 +1,21 @@
+# Hệ điều hành
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Trình soạn thảo
+.vscode/
+.idea/
+*.swp
+*~
+
+# Tệp tạm
+*.log
+*.tmp
+~$*
+
+# File sao lưu dữ liệu tải về từ ứng dụng (có thể chứa thông tin thật)
+MTHouse_SaoLuu_*.json
+BangTheoDoi_*.csv
+BaoCaoTongHop_*.csv
