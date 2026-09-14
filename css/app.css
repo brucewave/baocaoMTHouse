@@ -398,7 +398,12 @@ table { border-collapse: collapse; }
 }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s4); }
 
-/* Ô mật khẩu kèm nút con mắt */
+/* Ô mật khẩu kèm nút con mắt.
+   Edge tự chèn sẵn một nút hiện mật khẩu của riêng nó vào ô type="password",
+   để nguyên sẽ thành hai con mắt cạnh nhau nên phải ẩn nút mặc định đi. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; width: 0; height: 0; }
+
 .pass-wrap { position: relative; }
 .pass-wrap .input { padding-right: 46px; }
 .pass-eye {
