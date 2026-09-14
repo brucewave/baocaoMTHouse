@@ -118,6 +118,42 @@
   /* =========================================================
      ĐĂNG NHẬP
      ========================================================= */
+  /* ---------------- Ghi nhớ đăng nhập ----------------
+     Có ghi nhớ  → lưu ở localStorage, đóng trình duyệt mở lại vẫn còn đăng nhập.
+     Không ghi nhớ → lưu ở sessionStorage, đóng trình duyệt là thoát.
+     Tên đăng nhập luôn được nhớ riêng để lần sau điền sẵn cho đỡ gõ. */
+  var K_USER = 'mth_user', K_LAST = 'mth_last_user', K_REMEMBER = 'mth_remember';
+
+  function store(kind, key, val) {
+    try {
+      var s = kind === 'session' ? sessionStorage : localStorage;
+      if (val === undefined) return s.getItem(key);
+      if (val === null) s.removeItem(key); else s.setItem(key, val);
+    } catch (err) { /* trình duyệt chặn lưu trữ thì bỏ qua */ }
+    return null;
+  }
+
+  function rememberLogin(id, username, remember) {
+    if (remember) {
+      store('local', K_USER, id);
+      store('session', K_USER, null);
+    } else {
+      store('session', K_USER, id);
+      store('local', K_USER, null);
+    }
+    store('local', K_REMEMBER, remember ? '1' : '0');
+    store('local', K_LAST, username || '');
+  }
+
+  function storedUserId() {
+    return store('session', K_USER) || store('local', K_USER);
+  }
+
+  function clearLogin() {
+    store('local', K_USER, null);
+    store('session', K_USER, null);
+  }
+
   /** Ô mật khẩu kèm nút con mắt để kiểm tra mình gõ đúng chưa */
   function passField(id, label, autocomplete, help) {
     return '<div class="field">' +
@@ -149,6 +185,8 @@
   function renderLogin() {
     revokeUrls();
     var app = document.getElementById('app');
+    var lastUser = store('local', K_LAST) || '';
+    var remember = store('local', K_REMEMBER) !== '0';   /* mặc định có ghi nhớ */
 
     app.innerHTML =
       '<div class="login">' +
@@ -174,7 +212,8 @@
           '<div class="field">' +
             '<label for="lg-user">Tên đăng nhập <span class="req">*</span></label>' +
             '<input class="input" id="lg-user" autocomplete="username" autocapitalize="off" ' +
-              'spellcheck="false" required autofocus>' +
+              'spellcheck="false" value="' + U.esc(lastUser) + '" required' +
+              (lastUser ? '' : ' autofocus') + '>' +
           '</div>' +
           '<div class="field">' +
             '<label for="lg-pass">Mật khẩu <span class="req">*</span></label>' +
@@ -185,6 +224,12 @@
             '</div>' +
             '<span class="err" id="lg-err" hidden></span>' +
           '</div>' +
+
+          '<div class="check-row">' +
+            '<input type="checkbox" id="lg-remember"' + (remember ? ' checked' : '') + '>' +
+            '<label for="lg-remember">Ghi nhớ đăng nhập trên máy này</label>' +
+          '</div>' +
+
           '<button class="btn btn-primary btn-lg btn-block" type="submit">' + U.icon('check') + ' Đăng nhập</button>' +
         '</form>' +
 
@@ -192,6 +237,8 @@
           'Tài khoản do quản lý cấp. Quên mật khẩu thì liên hệ quản lý để cấp lại.' +
         '</p>' +
       '</div></div>';
+
+    if (lastUser) { var pw = U.$('#lg-pass', app); if (pw) pw.focus(); }
 
     U.$('#login-form', app).addEventListener('submit', function (e) {
       e.preventDefault();
@@ -215,7 +262,7 @@
         return;
       }
 
-      localStorage.setItem('mth_user', target.id);
+      rememberLogin(target.id, target.username, U.$('#lg-remember', app).checked);
       S.user = target;
       errEl.hidden = true;
       var home = '#/' + homeView();
@@ -277,7 +324,7 @@
   }
 
   function logout() {
-    localStorage.removeItem('mth_user');
+    clearLogin();
     S.user = null;
     location.hash = '';
     renderLogin();
@@ -2897,7 +2944,7 @@
         .then(function (ok) {
           if (!ok) return;
           return Store.resetAll().then(Store.seed).then(function () {
-            localStorage.removeItem('mth_user');
+            clearLogin();
             location.hash = '';
             location.reload();
           });
@@ -2978,7 +3025,7 @@
   Store.ready()
     .then(reload)
     .then(function () {
-      var uid = localStorage.getItem('mth_user');
+      var uid = storedUserId();
       var u = uid ? S.employees.filter(function (e) { return e.id === uid; })[0] : null;
       S.user = u || null;
       /* Quản lý vào là thấy biểu đồ trước; nhân viên vào thẳng ô nhập việc */

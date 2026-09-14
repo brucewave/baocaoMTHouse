@@ -398,6 +398,21 @@ table { border-collapse: collapse; }
 }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s4); }
 
+/* Hàng ô tích, ví dụ Ghi nhớ đăng nhập */
+.check-row {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 44px; margin-bottom: var(--s3);
+}
+.check-row input[type="checkbox"] {
+  width: 18px; height: 18px; flex: none; cursor: pointer;
+  accent-color: var(--brand-600);
+}
+.check-row label {
+  font-size: 14px; color: var(--ink-2); cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+}
+.check-row:hover label { color: var(--ink); }
+
 /* Ô mật khẩu kèm nút con mắt.
    Edge tự chèn sẵn một nút hiện mật khẩu của riêng nó vào ô type="password",
    để nguyên sẽ thành hai con mắt cạnh nhau nên phải ẩn nút mặc định đi. */
