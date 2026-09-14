@@ -83,8 +83,9 @@ function mth_baocao_assets() {
 	wp_enqueue_script( 'mth-utils',  $uri . '/js/utils.js',  array(), $ver( 'js/utils.js' ),  true );
 	wp_enqueue_script( 'mth-store',  $uri . '/js/store.js',  array( 'mth-utils' ), $ver( 'js/store.js' ),  true );
 	wp_enqueue_script( 'mth-charts', $uri . '/js/charts.js', array( 'mth-utils' ), $ver( 'js/charts.js' ), true );
+	wp_enqueue_script( 'mth-xlsx',   $uri . '/js/xlsx.js',   array( 'mth-utils' ), $ver( 'js/xlsx.js' ), true );
 	wp_enqueue_script( 'mth-quote',  $uri . '/js/quote.js',  array( 'mth-utils', 'mth-store' ), $ver( 'js/quote.js' ), true );
-	wp_enqueue_script( 'mth-app',    $uri . '/js/app.js',    array( 'mth-utils', 'mth-store', 'mth-charts', 'mth-quote' ), $ver( 'js/app.js' ), true );
+	wp_enqueue_script( 'mth-app',    $uri . '/js/app.js',    array( 'mth-utils', 'mth-store', 'mth-charts', 'mth-quote', 'mth-xlsx' ), $ver( 'js/app.js' ), true );
 
 	// Ứng dụng nạp ảnh theo đường dẫn tương đối khi chạy độc lập;
 	// trong WordPress phải chỉ rõ thư mục assets của theme.

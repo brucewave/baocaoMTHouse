@@ -25,7 +25,7 @@
   var NAV = [
     { id: 'send',      label: 'Gửi báo cáo',   short: 'Gửi',      icon: 'send',     roles: ['staff', 'admin'] },
     { id: 'list',      label: 'Báo cáo',       short: 'Báo cáo',  icon: 'inbox',    roles: ['staff', 'admin'] },
-    { id: 'projects',  label: 'Khách hàng',    short: 'Khách',    icon: 'building', roles: ['staff', 'admin'] },
+    { id: 'projects',  label: 'Khách hàng',    short: 'Khách',    icon: 'building', roles: ['admin'] },
     { id: 'quotes',    label: 'Báo giá',       short: 'Báo giá',  icon: 'money',    roles: ['admin'] },
     { id: 'timesheet', label: 'Bảng chấm công',short: 'Chấm công',icon: 'table',    roles: ['staff', 'admin'] },
     { id: 'summary',   label: 'Tổng hợp',      short: 'Tổng hợp', icon: 'chart',    roles: ['staff', 'admin'] },
@@ -254,9 +254,13 @@
   /* =========================================================
      KHUNG ỨNG DỤNG
      ========================================================= */
+  /** Quản lý: số báo cáo chờ duyệt. Nhân viên: số báo cáo bị trả lại cần sửa. */
   function pendingCount() {
+    if (isAdmin()) {
+      return S.reports.filter(function (r) { return r.status === 'pending'; }).length;
+    }
     return S.reports.filter(function (r) {
-      return r.status === 'pending' && (isAdmin() || r.employeeId === S.user.id);
+      return r.status === 'rejected' && r.employeeId === S.user.id;
     }).length;
   }
 
@@ -266,7 +270,7 @@
   function navFor() {
     var order = isAdmin()
       ? ['summary', 'list', 'projects', 'quotes', 'timesheet']
-      : ['send', 'list', 'projects', 'timesheet', 'summary'];
+      : ['send', 'list', 'timesheet', 'summary'];
     return order.map(function (id) {
       return NAV.filter(function (n) { return n.id === id; })[0];
     }).filter(function (it) { return it && it.roles.indexOf(S.user.role) >= 0; });
@@ -285,7 +289,8 @@
       .map(function (it) {
         var badge = '';
         if (it.id === 'list' && n) {
-          badge = '<span class="nav-badge" aria-label="' + n + ' báo cáo chờ duyệt">' + n + '</span>';
+          badge = '<span class="nav-badge" aria-label="' + n +
+            (isAdmin() ? ' báo cáo chờ duyệt' : ' báo cáo bị trả lại cần sửa') + '">' + n + '</span>';
         } else if (it.id === 'projects' && due) {
           badge = '<span class="nav-badge" aria-label="' + due + ' khách cần liên hệ">' + due + '</span>';
         }
@@ -406,13 +411,24 @@
       '</div></div>';
   }
 
-  /** Dòng nhắc gọn khi còn báo cáo chờ duyệt chưa được tính vào số liệu */
+  /**
+   * Dòng nhắc dưới bộ lọc.
+   * Quản lý cần biết còn bao nhiêu báo cáo chờ duyệt.
+   * Nhân viên không duyệt gì cả, nên chỉ nhắc những báo cáo bị trả lại cần sửa.
+   */
   function pendingNote(month, employeeId) {
-    var n = reportsIn({ month: month, employeeId: employeeId, status: 'pending' }).length;
-    if (!n) return '';
-    return '<p class="help no-print" style="margin:-8px 0 16px">' + U.icon('clock') +
-      ' Còn <b>' + n + ' báo cáo chờ duyệt</b> chưa được tính vào số liệu bên dưới. ' +
-      '<a href="#/list?status=pending&amp;month=' + encodeURIComponent(month) + '">Duyệt ngay</a></p>';
+    if (isAdmin()) {
+      var n = reportsIn({ month: month, employeeId: employeeId, status: 'pending' }).length;
+      if (!n) return '';
+      return '<p class="help no-print" style="margin:-8px 0 16px">' + U.icon('clock') +
+        ' Còn <b>' + n + ' báo cáo chờ duyệt</b> chưa được tính vào số liệu bên dưới. ' +
+        '<a href="#/list?status=pending&amp;month=' + encodeURIComponent(month) + '">Duyệt ngay</a></p>';
+    }
+    var r = reportsIn({ month: month, employeeId: S.user.id, status: 'rejected' }).length;
+    if (!r) return '';
+    return '<p class="help no-print" style="margin:-8px 0 16px;color:#A82F2F">' + U.icon('alert') +
+      ' Có <b>' + r + ' báo cáo bị trả lại</b> cần sửa rồi gửi lại. ' +
+      '<a href="#/list?status=rejected&amp;month=' + encodeURIComponent(month) + '">Xem ngay</a></p>';
   }
 
   function employeePicker(value, allowAll) {
@@ -992,8 +1008,8 @@
         '<div><h2>Bảng theo dõi báo cáo ngày và tháng</h2></div>' +
         '<div class="grow"></div>' +
         '<button class="btn btn-primary" id="btn-fs">' + U.icon('zoom') + ' Xem toàn màn hình</button>' +
-        '<button class="btn" id="btn-csv">' + U.icon('download') + ' Xuất Excel (CSV)</button>' +
-        '<button class="btn" id="btn-print">' + U.icon('print') + ' In</button>' +
+        '<button class="btn" id="btn-csv">' + U.icon('download') + ' Xuất Excel</button>' +
+        '<button class="btn" id="btn-print">' + U.icon('print') + ' Xuất PDF</button>' +
       '</div>' +
 
       '<div class="filterbar" id="fbar">' +
@@ -1061,7 +1077,7 @@
     U.$('#tg-days', fbar).addEventListener('click', function () { setQ({ alldays: showAll ? '' : '1' }); });
     U.$('#btn-print', main).addEventListener('click', function () { window.print(); });
     U.$('#btn-csv', main).addEventListener('click', function () {
-      exportTimesheetCSV(e, month, rows, cols, allStaff);
+      exportTimesheetXLSX(e, month, rows, cols, agg, allStaff);
     });
 
     var fsBtn = U.$('#btn-fs', main);
@@ -1178,45 +1194,135 @@
       '</tbody><tfoot>' + foot + '</tfoot></table>';
   }
 
-  function exportTimesheetCSV(e, month, rows, cols, allStaff) {
-    var out = [];
-    out.push([S.settings.company]);
-    out.push(['BẢNG THEO DÕI BÁO CÁO NGÀY VÀ THÁNG — ' + U.monthVN(month)]);
-    out.push([]);
+  /**
+   * Xuất bảng chấm công ra .xlsx có định dạng, dựng đúng bố cục file Excel
+   * đang dùng: hai dòng tiêu đề, khối thông tin nhân viên, dải tiêu đề xanh
+   * với cột ngày gộp HC/TC, và dòng tổng cộng.
+   */
+  function exportTimesheetXLSX(e, month, rows, cols, agg, allStaff) {
+    var X = XLSX.S;
+    var fixed = ['STT', 'Mã công trình'];
+    if (allStaff) fixed.push('Nhân viên');
+    fixed = fixed.concat(['Hạng mục', 'Diễn giải nội dung công việc', 'Khung giờ', 'Tổng HC', 'Tổng TC']);
+    var base = fixed.length;
+    var rate = allStaff ? 0 : Store.hourlyRate(e, S.settings);
+
+    var R = [], M = [];
+
+    R[0] = [{ v: S.settings.company, s: X.company }];
+    R[1] = [{ v: 'BẢNG THEO DÕI BÁO CÁO NGÀY VÀ THÁNG', h: 22, s: X.title }];
+    R[1].h = 24;
+    M.push([0, 0, 0, base - 1], [1, 0, 1, base - 1]);
+
     if (allStaff) {
-      out.push(['Phạm vi', 'Toàn bộ nhân viên']);
+      R[3] = [{ v: 'Phạm vi:', s: X.label }, { v: 'Toàn bộ nhân viên', s: X.labelFill }, null,
+              { v: 'Số nhân viên:', s: X.label }, { v: Object.keys(agg.byEmployee).length },
+              { v: 'Tổng giờ:', s: X.label }, { v: agg.total, s: X.num1 }];
+      R[4] = [null, null, null, { v: 'Kỳ báo cáo:', s: X.label }, { v: U.monthVN(month) }];
     } else {
-      out.push(['Họ & tên', e.name, '', 'Mức lương / tháng', e.salaryMonth,
-        '', 'Tổng số ngày', e.workDays || S.settings.standardDays,
-        '', 'Lương 1 giờ', Math.round(Store.hourlyRate(e, S.settings))]);
+      R[3] = [{ v: 'Họ & tên:', s: X.label }, { v: e.name, s: X.labelFill }, null,
+              { v: 'Mức lương / tháng:', s: X.label }, { v: Number(e.salaryMonth) || 0, s: X.moneyPlain },
+              { v: 'Tổng số ngày:', s: X.label }, { v: Number(e.workDays || S.settings.standardDays) }];
+      R[4] = [null, null, null, { v: 'Lương 1 giờ:', s: X.label }, { v: Math.round(rate), s: X.moneyPlain },
+              { v: 'Kỳ báo cáo:', s: X.label }, { v: U.monthVN(month) }];
     }
-    out.push([]);
+    M.push([3, 1, 3, 2]);
 
-    var h = ['STT', 'Mã công trình'];
-    if (allStaff) h.push('Nhân viên');
-    h = h.concat(['Hạng mục', 'Diễn giải nội dung công việc', 'Khung giờ', 'Tổng HC', 'Tổng TC']);
-    cols.forEach(function (d) { h.push(U.weekdayVN(d) + ' (' + U.dayShort(d) + ') HC', 'TC'); });
-    out.push(h);
-
-    var tHC = 0, tTC = 0;
-    rows.forEach(function (r, i) {
-      tHC += Number(r.hc) || 0; tTC += Number(r.tc) || 0;
-      var line = [i + 1, proj(r.projectId).name];
-      if (allStaff) line.push(emp(r.employeeId).name);
-      line = line.concat([cat(r.categoryId).name, r.description,
-        U.rangeVN(r.timeFrom, r.timeTo), r.hc, r.tc]);
-      cols.forEach(function (d) {
-        line.push(d === r.date && r.hc ? r.hc : '', d === r.date && r.tc ? r.tc : '');
-      });
-      out.push(line);
+    /* hai dòng tiêu đề: cột cố định gộp dọc, mỗi ngày gộp ngang hai ô HC/TC */
+    var HR = 6;
+    R[HR] = []; R[HR + 1] = [];
+    R[HR].h = 20; R[HR + 1].h = 18;
+    fixed.forEach(function (t, i2) {
+      R[HR][i2] = { v: t, s: X.head };
+      R[HR + 1][i2] = { v: '', s: X.head };
+      M.push([HR, i2, HR + 1, i2]);
     });
-    var totLine = ['', 'TỔNG CỘNG HÀNG THÁNG'];
-    if (allStaff) totLine.push('');
-    out.push(totLine.concat(['', '', '', U.round2(tHC), U.round2(tTC)]));
+    cols.forEach(function (d, k) {
+      var c = base + k * 2;
+      R[HR][c] = { v: U.weekdayVN(d) + ' (' + U.dayShort(d) + ')', s: X.headDay };
+      R[HR][c + 1] = { v: '', s: X.headDay };
+      M.push([HR, c, HR, c + 1]);
+      R[HR + 1][c] = { v: 'HC', s: X.headSub };
+      R[HR + 1][c + 1] = { v: 'TC', s: X.headSub };
+    });
 
-    U.downloadCSV('BangTheoDoi_' +
-      (allStaff ? 'ToanBoNhanVien' : U.noAccent(e.name).replace(/\s+/g, '')) + '_' + month + '.csv', out);
-    U.toast('Đã tải file CSV — mở được bằng Excel', 'ok');
+    var first = HR + 2;
+    rows.forEach(function (r, i2) {
+      var line = [{ v: i2 + 1, s: X.cellCenter }, { v: proj(r.projectId).name, s: X.cell }];
+      if (allStaff) line.push({ v: emp(r.employeeId).name, s: X.cell });
+      line.push(
+        { v: cat(r.categoryId).name, s: X.cellCenter },
+        { v: r.description, s: X.cellWrap },
+        { v: U.rangeVN(r.timeFrom, r.timeTo), s: X.cellCenter },
+        { v: Number(r.hc) || 0, s: X.num1 },
+        { v: Number(r.tc) || 0, s: X.num1 }
+      );
+      cols.forEach(function (d) {
+        var on = d === r.date;
+        line.push({ v: on && r.hc ? Number(r.hc) : '', s: X.dayVal });
+        line.push({ v: on && r.tc ? Number(r.tc) : '', s: X.dayVal });
+      });
+      R[first + i2] = line;
+    });
+
+    var dayTot = {};
+    cols.forEach(function (d) { dayTot[d] = { hc: 0, tc: 0 }; });
+    rows.forEach(function (r) {
+      if (!dayTot[r.date]) return;
+      dayTot[r.date].hc += Number(r.hc) || 0;
+      dayTot[r.date].tc += Number(r.tc) || 0;
+    });
+
+    var tr = first + rows.length;
+    var tot = [];
+    for (var i3 = 0; i3 < base - 2; i3++) tot.push({ v: i3 === 0 ? 'TỔNG CỘNG HÀNG THÁNG' : '', s: X.total });
+    tot.push({ v: agg.hc, s: X.totalNum }, { v: agg.tc, s: X.totalNum });
+    cols.forEach(function (d) {
+      tot.push({ v: dayTot[d].hc || '', s: X.totalNum });
+      tot.push({ v: dayTot[d].tc || '', s: X.totalNum });
+    });
+    R[tr] = tot;
+    M.push([tr, 0, tr, base - 3]);
+
+    var widths = [6, 30];
+    if (allStaff) widths.push(22);
+    widths = widths.concat([14, 50, 16, 10, 10]);
+    cols.forEach(function () { widths.push(7, 7); });
+
+    var sheets = [{
+      name: 'Báo cáo ngày', cols: widths, rows: R, merges: M, freeze: [first, 2]
+    }];
+
+    /* Khi xem toàn bộ nhân viên thì thêm sheet cộng giờ theo từng người */
+    if (allStaff) {
+      var keys = Object.keys(agg.byEmployee).sort(function (a, b) {
+        return (agg.byEmployee[b].hc + agg.byEmployee[b].tc) - (agg.byEmployee[a].hc + agg.byEmployee[a].tc);
+      });
+      var R2 = [
+        [{ v: 'TỔNG GIỜ THEO NHÂN VIÊN — ' + U.monthVN(month), s: X.title }],
+        [],
+        [{ v: 'STT', s: X.head }, { v: 'Nhân viên', s: X.head }, { v: 'Vị trí', s: X.head },
+         { v: 'Số đầu việc', s: X.head }, { v: 'Giờ HC', s: X.head }, { v: 'Giờ TC', s: X.head },
+         { v: 'Tổng giờ', s: X.head }]
+      ];
+      keys.forEach(function (k, i4) {
+        var v = agg.byEmployee[k], who = emp(k);
+        R2.push([{ v: i4 + 1, s: X.cellCenter }, { v: who.name, s: X.cell }, { v: who.position || '', s: X.cell },
+          { v: v.n, s: X.cellCenter }, { v: v.hc, s: X.num1 }, { v: v.tc, s: X.num1 },
+          { v: U.round2(v.hc + v.tc), s: X.num1 }]);
+      });
+      R2.push([{ v: 'TỔNG CỘNG', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total },
+        { v: rows.length, s: X.totalNum }, { v: agg.hc, s: X.totalNum },
+        { v: agg.tc, s: X.totalNum }, { v: agg.total, s: X.totalNum }]);
+      sheets.push({
+        name: 'Tổng giờ theo nhân viên', cols: [6, 30, 24, 14, 12, 12, 14], rows: R2,
+        merges: [[0, 0, 0, 6], [R2.length - 1, 0, R2.length - 1, 2]]
+      });
+    }
+
+    XLSX.download('BangChamCong_' +
+      (allStaff ? 'ToanBoNhanVien' : U.noAccent(e.name).replace(/\s+/g, '')) + '_' + month + '.xlsx', sheets);
+    U.toast('Đã tải file Excel', 'ok');
   }
 
   /* =========================================================
@@ -1236,8 +1342,8 @@
       '<div class="page-head">' +
         '<div><h2>Báo cáo tổng hợp tháng</h2></div>' +
         '<div class="grow"></div>' +
-        '<button class="btn" id="btn-csv">' + U.icon('download') + ' Xuất Excel (CSV)</button>' +
-        '<button class="btn" id="btn-print">' + U.icon('print') + ' In / Lưu PDF</button>' +
+        '<button class="btn" id="btn-csv">' + U.icon('download') + ' Xuất Excel</button>' +
+        '<button class="btn" id="btn-print">' + U.icon('print') + ' Xuất PDF</button>' +
       '</div>' +
 
       '<div class="filterbar" id="fbar">' +
@@ -1257,7 +1363,9 @@
       (!rows.length
         ? '<div class="card"><div class="empty">' + U.icon('chart') + '<h3>Chưa có dữ liệu để tổng hợp</h3>' +
           '<p>Không có báo cáo đã duyệt trong ' + U.monthVN(month).toLowerCase() + '.</p>' +
-          '<a class="btn btn-primary" href="#/list?status=pending">' + U.icon('inbox') + ' Xem báo cáo chờ duyệt</a></div></div>'
+          (isAdmin()
+            ? '<a class="btn btn-primary" href="#/list?status=pending">' + U.icon('inbox') + ' Xem báo cáo chờ duyệt</a>'
+            : '<a class="btn btn-primary" href="#/send">' + U.icon('plus') + ' Gửi báo cáo</a>') + '</div></div>'
 
         /* 1 — Ba con số chính */
         : '<div class="kpi-row">' +
@@ -1298,7 +1406,7 @@
     bindMonthSelect(fbar);
     var sel = U.$('#f-emp', fbar); if (sel) sel.addEventListener('change', function () { setQ({ emp: sel.value }); });
     U.$('#btn-print', main).addEventListener('click', function () { window.print(); });
-    U.$('#btn-csv', main).addEventListener('click', function () { exportSummaryCSV(single, month, agg, rows); });
+    U.$('#btn-csv', main).addEventListener('click', function () { exportSummaryXLSX(single, month, agg, rows); });
 
     if (!rows.length) return;
 
@@ -1483,54 +1591,155 @@
       '</table></div></div></details>';
   }
 
-  function exportSummaryCSV(single, month, agg, rows) {
-    var out = [];
-    out.push([S.settings.company]);
-    out.push(['BÁO CÁO TỔNG HỢP CÔNG VIỆC VÀ PHÂN TÍCH TIẾN ĐỘ THÁNG — ' + U.monthVN(month)]);
-    if (single) out.push(['Nhân viên', single.name]);
-    out.push([]);
-    out.push(['Tổng giờ hành chính', agg.hc, 'Tổng giờ tăng ca', agg.tc, 'Tổng cộng', agg.total]);
-    if (single) {
-      var p = Store.payroll(single, S.settings, agg.hc, agg.tc);
-      out.push(['Đơn giá giờ', Math.round(p.rate), 'Lương tăng ca', Math.round(p.ot), 'TỔNG LƯƠNG', Math.round(p.total)]);
+  /**
+   * Xuất báo cáo tổng hợp ra .xlsx, dựng đúng bố cục file Excel đang dùng:
+   * ba ô số lớn trên cùng, mục I thống kê theo công trình cạnh bảng tổng hợp
+   * theo hạng mục, rồi mục II phân tích diễn giải chi tiết.
+   */
+  function exportSummaryXLSX(single, month, agg, rows) {
+    var X = XLSX.S;
+    var pay = single ? Store.payroll(single, S.settings, agg.hc, agg.tc) : null;
+    var R = [], M = [];
+
+    R[0] = [{ v: S.settings.company, s: X.company }];
+    R[1] = [{ v: 'BÁO CÁO TỔNG HỢP CÔNG VIỆC VÀ PHÂN TÍCH TIẾN ĐỘ THÁNG', s: X.title }];
+    R[1].h = 24;
+    R[2] = [{ v: (single ? single.name + ' · ' : 'Toàn bộ nhân viên · ') + U.monthVN(month), s: X.muted }];
+    M.push([0, 0, 0, 11], [1, 0, 1, 11], [2, 0, 2, 11]);
+
+    /* ba ô số lớn */
+    R[4] = [{ v: 'TỔNG GIỜ LÀM HÀNH CHÍNH', s: X.banner }, { v: '', s: X.banner }, { v: '', s: X.banner },
+            { v: '', s: X.banner }, { v: 'TỔNG GIỜ TĂNG CA (TC)', s: X.banner }, { v: '', s: X.banner },
+            { v: '', s: X.banner }, { v: '', s: X.banner },
+            { v: pay ? 'TỔNG LƯƠNG TỰ ĐỘNG THÁNG' : 'TỔNG THỜI GIAN LÀM VIỆC', s: X.banner },
+            { v: '', s: X.banner }, { v: '', s: X.banner }, { v: '', s: X.banner }];
+    R[5] = [{ v: agg.hc, s: X.bannerVal }, { v: '', s: X.bannerVal }, { v: '', s: X.bannerVal },
+            { v: '', s: X.bannerVal }, { v: agg.tc, s: X.bannerVal }, { v: '', s: X.bannerVal },
+            { v: '', s: X.bannerVal }, { v: '', s: X.bannerVal },
+            { v: pay ? Math.round(pay.total) : agg.total, s: pay ? X.bannerMoney : X.bannerVal },
+            { v: '', s: X.bannerVal }, { v: '', s: X.bannerVal }, { v: '', s: X.bannerVal }];
+    R[5].h = 26;
+    M.push([4, 0, 4, 3], [4, 4, 4, 7], [4, 8, 4, 11],
+           [5, 0, 5, 3], [5, 4, 5, 7], [5, 8, 5, 11]);
+
+    /* mục I bên trái, tổng hợp theo hạng mục bên phải */
+    R[7] = [{ v: 'I. THỐNG KÊ THỜI GIAN THEO CÔNG TRÌNH', s: X.section }];
+    R[7][7] = { v: 'TỔNG HỢP THEO HẠNG MỤC (TỰ ĐỘNG TỪ BÁO CÁO NGÀY)', s: X.section };
+    M.push([7, 0, 7, 5], [7, 7, 7, 11]);
+
+    R[8] = [{ v: 'STT', s: X.head }, { v: 'Tên Công Trình / Khách Hàng', s: X.head },
+            { v: 'Giờ HC', s: X.head }, { v: 'Giờ TC', s: X.head },
+            { v: 'Tổng Thời Gian (Giờ)', s: X.head }, { v: 'Tỷ Trọng (%)', s: X.head }, null,
+            { v: 'Hạng Mục', s: X.head }, { v: 'Tổng Giờ HC', s: X.head },
+            { v: 'Tổng Giờ TC', s: X.head }, { v: 'Tổng Cộng', s: X.head }, { v: 'Tỷ Trọng (%)', s: X.head }];
+
+    var pKeys = Object.keys(agg.byProject).sort(function (a, b) {
+      return (agg.byProject[b].hc + agg.byProject[b].tc) - (agg.byProject[a].hc + agg.byProject[a].tc);
+    });
+    var cList = S.categories.filter(function (c) { return agg.byCategory[c.id]; });
+    var nBody = Math.max(pKeys.length, cList.length);
+
+    for (var i2 = 0; i2 < nBody; i2++) {
+      var line = [];
+      if (i2 < pKeys.length) {
+        var v = agg.byProject[pKeys[i2]], t = U.round2(v.hc + v.tc);
+        line = [{ v: i2 + 1, s: X.cellCenter }, { v: proj(pKeys[i2]).name, s: X.cell },
+                { v: v.hc, s: X.num1 }, { v: v.tc, s: X.num1 }, { v: t, s: X.num1 },
+                { v: agg.total ? t / agg.total : 0, s: X.pct }];
+      } else {
+        line = [null, null, null, null, null, null];
+      }
+      line[6] = null;
+      if (i2 < cList.length) {
+        var c = cList[i2], cv = agg.byCategory[c.id], ct = U.round2(cv.hc + cv.tc);
+        line[7] = { v: c.name, s: X.cell };
+        line[8] = { v: cv.hc, s: X.num1 };
+        line[9] = { v: cv.tc, s: X.num1 };
+        line[10] = { v: ct, s: X.num1 };
+        line[11] = { v: agg.total ? ct / agg.total : 0, s: X.pct };
+      }
+      R[9 + i2] = line;
     }
-    out.push([]);
 
-    out.push(['I. THỐNG KÊ THỜI GIAN THEO CÔNG TRÌNH']);
-    out.push(['STT', 'Tên công trình', 'Giờ HC', 'Giờ TC', 'Tổng', 'Tỷ trọng %']);
-    Object.keys(agg.byProject).forEach(function (k, i) {
-      var v = agg.byProject[k], t = U.round2(v.hc + v.tc);
-      out.push([i + 1, proj(k).name, v.hc, v.tc, t, agg.total ? U.round2(t / agg.total * 100) : 0]);
+    var tRow = 9 + nBody;
+    R[tRow] = [{ v: 'TỔNG CỘNG', s: X.total }, { v: '', s: X.total },
+               { v: agg.hc, s: X.totalNum }, { v: agg.tc, s: X.totalNum },
+               { v: agg.total, s: X.totalNum }, { v: 1, s: X.pct }, null,
+               { v: 'TỔNG CỘNG', s: X.total }, { v: agg.hc, s: X.totalNum },
+               { v: agg.tc, s: X.totalNum }, { v: agg.total, s: X.totalNum }, { v: 1, s: X.pct }];
+    M.push([tRow, 0, tRow, 1]);
+
+    /* mục II — phân tích diễn giải chi tiết */
+    var s2 = tRow + 3;
+    R[s2] = [{ v: 'II. PHÂN TÍCH DIỄN GIẢI CHI TIẾT VÀ LÝ DO THỰC HIỆN CÔNG VIỆC', s: X.section }];
+    M.push([s2, 0, s2, 11]);
+
+    R[s2 + 1] = [{ v: 'STT', s: X.head }, { v: 'Hạng Mục', s: X.head },
+                 { v: 'Chi Tiết Công Việc Thực Hiện', s: X.head }, { v: '', s: X.head },
+                 { v: 'Thời Gian (Giờ)', s: X.head },
+                 { v: 'Lý Do / Nguyên Nhân / Mục Tiêu Chi Tiết', s: X.head },
+                 { v: '', s: X.head }, { v: '', s: X.head }];
+    M.push([s2 + 1, 2, s2 + 1, 3], [s2 + 1, 5, s2 + 1, 7]);
+
+    var groups = Object.keys(agg.byReason).map(function (k) { return agg.byReason[k]; })
+      .sort(function (a, b) {
+        if (a.categoryId !== b.categoryId) return (cat(a.categoryId).order || 9) - (cat(b.categoryId).order || 9);
+        return (b.hc + b.tc) - (a.hc + a.tc);
+      });
+
+    groups.forEach(function (g, i3) {
+      var r0 = s2 + 2 + i3;
+      R[r0] = [{ v: i3 + 1, s: X.cellCenter }, { v: cat(g.categoryId).name, s: X.cellCenter },
+               { v: g.items.join(' · '), s: X.cellWrap }, { v: '', s: X.cellWrap },
+               { v: U.round2(g.hc + g.tc), s: X.num1 },
+               { v: g.reason, s: X.cellWrap }, { v: '', s: X.cellWrap }, { v: '', s: X.cellWrap }];
+      M.push([r0, 2, r0, 3], [r0, 5, r0, 7]);
     });
-    out.push(['', 'TỔNG CỘNG', agg.hc, agg.tc, agg.total, 100]);
-    out.push([]);
 
-    out.push(['TỔNG HỢP THEO HẠNG MỤC']);
-    out.push(['Hạng mục', 'Tổng giờ HC', 'Tổng giờ TC', 'Tổng cộng', 'Tỷ trọng %']);
-    S.categories.forEach(function (c) {
-      var v = agg.byCategory[c.id]; if (!v) return;
-      var t = U.round2(v.hc + v.tc);
-      out.push([c.name, v.hc, v.tc, t, agg.total ? U.round2(t / agg.total * 100) : 0]);
-    });
-    out.push([]);
+    var t2 = s2 + 2 + groups.length;
+    R[t2] = [{ v: 'TỔNG CỘNG GIỜ THỰC HIỆN', s: X.total }, { v: '', s: X.total },
+             { v: '', s: X.total }, { v: '', s: X.total },
+             { v: agg.total, s: X.totalNum }, { v: '', s: X.total },
+             { v: '', s: X.total }, { v: '', s: X.total }];
+    M.push([t2, 0, t2, 3], [t2, 5, t2, 7]);
 
-    out.push(['II. PHÂN TÍCH DIỄN GIẢI CHI TIẾT & LÝ DO THỰC HIỆN']);
-    out.push(['STT', 'Hạng mục', 'Chi tiết công việc thực hiện', 'Thời gian (giờ)', 'Lý do / Mục tiêu']);
-    Object.keys(agg.byReason).forEach(function (k, i) {
-      var g = agg.byReason[k];
-      out.push([i + 1, cat(g.categoryId).name, g.items.join(' · '), U.round2(g.hc + g.tc), g.reason]);
-    });
-    out.push([]);
+    var sheets = [{
+      name: 'Tổng hợp & Phân tích',
+      cols: [6, 34, 22, 22, 26, 14, 3, 18, 13, 13, 13, 13],
+      rows: R, merges: M
+    }];
 
-    out.push(['CHI TIẾT TỪNG BÁO CÁO']);
-    out.push(['Ngày', 'Nhân viên', 'Công trình', 'Hạng mục', 'Diễn giải', 'Khung giờ', 'Giờ HC', 'Giờ TC', 'Trạng thái']);
-    rows.forEach(function (r) {
-      out.push([U.dateVN(r.date), emp(r.employeeId).name, proj(r.projectId).name, cat(r.categoryId).name,
-        r.description, U.rangeVN(r.timeFrom, r.timeTo), r.hc, r.tc, STATUS[r.status].label]);
-    });
+    /* sheet phụ: bảng lương từng người khi xem toàn bộ nhân viên */
+    if (!single) {
+      var eKeys = Object.keys(agg.byEmployee);
+      var R2 = [
+        [{ v: 'BẢNG LƯƠNG NHÂN VIÊN — ' + U.monthVN(month), s: X.title }],
+        [],
+        [{ v: 'STT', s: X.head }, { v: 'Nhân viên', s: X.head }, { v: 'Vị trí', s: X.head },
+         { v: 'Giờ HC', s: X.head }, { v: 'Giờ TC', s: X.head },
+         { v: 'Đơn giá giờ', s: X.head }, { v: 'Tổng lương', s: X.head }]
+      ];
+      var grand = 0;
+      eKeys.forEach(function (k, i4) {
+        var who = emp(k), v = agg.byEmployee[k];
+        var pp = Store.payroll(who, S.settings, v.hc, v.tc);
+        grand += pp.total;
+        R2.push([{ v: i4 + 1, s: X.cellCenter }, { v: who.name, s: X.cell },
+          { v: who.position || '', s: X.cell }, { v: v.hc, s: X.num1 }, { v: v.tc, s: X.num1 },
+          { v: Math.round(pp.rate), s: X.money }, { v: Math.round(pp.total), s: X.money }]);
+      });
+      R2.push([{ v: 'TỔNG CỘNG', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total },
+        { v: agg.hc, s: X.totalNum }, { v: agg.tc, s: X.totalNum },
+        { v: '', s: X.total }, { v: Math.round(grand), s: X.totalMoney }]);
+      sheets.push({
+        name: 'Bảng lương', cols: [6, 30, 24, 12, 12, 16, 18], rows: R2,
+        merges: [[0, 0, 0, 6], [R2.length - 1, 0, R2.length - 1, 2]]
+      });
+    }
 
-    U.downloadCSV('BaoCaoTongHop_' + (single ? U.noAccent(single.name).replace(/\s+/g, '') + '_' : '') + month + '.csv', out);
-    U.toast('Đã tải file CSV — mở được bằng Excel', 'ok');
+    XLSX.download('BaoCaoTongHop_' +
+      (single ? U.noAccent(single.name).replace(/\s+/g, '') + '_' : '') + month + '.xlsx', sheets);
+    U.toast('Đã tải file Excel', 'ok');
   }
 
   /* =========================================================
