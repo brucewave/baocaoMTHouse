@@ -405,6 +405,10 @@
 
     /* Dán ảnh từ Snipping Tool: Ctrl+V vào dòng đang chọn */
     main._onPaste = function (e) {
+      /* Hộp thoại ảnh có bộ nghe dán riêng. Nếu đang mở mà bộ này cũng chạy
+         thì một lần Ctrl+V sẽ thêm ảnh hai lần. */
+      var ov = document.getElementById('overlay-root');
+      if (ov && ov.children.length) return;
       if (!e.clipboardData || !e.clipboardData.files || !e.clipboardData.files.length) return;
       var ids = Object.keys(sel);
       var rowId = pasteTarget || (ids.length === 1 ? ids[0] : null);
@@ -555,7 +559,6 @@
 
     g.rows.forEach(function (r, ri) {
       var amt = rowAmount(r);
-      var auto = r.tManual ? '' : ' readonly';
       html += '<tr data-row="' + r.id + '"' + (sel[r.id] ? ' class="picked"' : '') + '>' +
         '<td class="c"><input type="checkbox" data-pick="' + r.id + '"' + (sel[r.id] ? ' checked' : '') + '></td>' +
         '<td class="c num">1.' + (gi + 1) + '.' + (ri + 1) + '</td>' +
@@ -566,15 +569,20 @@
         cellIn(r, 'u', '') +
         '<td><input class="input input-flat num r" data-f="q" data-r="' + r.id + '" value="' + (r.q == null ? '' : r.q) + '"></td>' +
         (r.priceOne
-          ? '<td colspan="2"><input class="input input-flat num r" data-f="vt" data-r="' + r.id + '" value="' + (r.vt || '') + '" ' +
-            'placeholder="đơn giá trọn gói"></td>'
-          : '<td><input class="input input-flat num r" data-f="nc" data-r="' + r.id + '" value="' + (r.nc || '') + '"></td>' +
-            '<td><input class="input input-flat num r" data-f="vt" data-r="' + r.id + '" value="' + (r.vt || '') + '"></td>') +
-        '<td class="qamount"><input class="input input-flat num r" data-f="t" data-r="' + r.id + '" ' +
-          'value="' + (r.tManual ? (r.t == null ? '' : r.t) : money(amt)) + '"' + auto + '>' +
-          '<button class="qlock" data-lock="' + r.id + '" type="button" title="' +
-            (r.tManual ? 'Đang gõ tay, bấm để tự tính lại' : 'Đang tự tính, bấm để gõ tay') + '">' +
-            U.icon(r.tManual ? 'edit' : 'refresh') + '</button></td>' +
+          ? '<td colspan="2"><input class="input input-flat num r money-in" data-f="vt" data-r="' + r.id + '" ' +
+            'value="' + money(r.vt || '') + '" placeholder="đơn giá trọn gói"></td>'
+          : '<td><input class="input input-flat num r money-in" data-f="nc" data-r="' + r.id + '" ' +
+              'value="' + money(r.nc || '') + '"></td>' +
+            '<td><input class="input input-flat num r money-in" data-f="vt" data-r="' + r.id + '" ' +
+              'value="' + money(r.vt || '') + '"></td>') +
+        '<td class="qamount' + (r.tManual ? ' manual' : '') + '">' +
+          '<input class="input input-flat num r money-in" data-f="t" data-r="' + r.id + '" ' +
+            'value="' + money(amt) + '" title="Gõ thẳng vào đây nếu muốn ghi số khác với số tự tính">' +
+          (r.tManual
+            ? '<button class="qlock" data-lock="' + r.id + '" type="button" ' +
+              'title="Đang ghi tay — bấm để tính lại tự động theo số lượng × đơn giá">' +
+              U.icon('refresh') + '</button>'
+            : '') + '</td>' +
         cellIn(r, 'g', '') +
         '<td class="c"><button class="btn btn-sm btn-ghost" data-rowmenu="' + r.id + '" ' +
           'aria-label="Thao tác dòng">' + U.icon('list') + '</button></td>' +
@@ -650,6 +658,14 @@
       }
     });
 
+    /* blur không lan lên, phải bắt ở pha capture */
+    main.addEventListener('blur', function (e) {
+      var t = e.target;
+      if (!t.classList || !t.classList.contains('money-in')) return;
+      if (!String(t.value).trim()) return;
+      t.value = money(num(t.value));
+    }, true);
+
     main.addEventListener('change', function (e) {
       var t = e.target;
       if (t.hasAttribute('data-head')) { q[t.getAttribute('data-head')] = t.value; }
@@ -684,8 +700,8 @@
     U.on(main, 'click', '[data-lock]', function (e, b) {
       var hit = rowById(b.getAttribute('data-lock'));
       if (!hit) return;
-      hit.r.tManual = !hit.r.tManual;
-      if (!hit.r.tManual) hit.r.t = null;
+      hit.r.tManual = false;
+      hit.r.t = null;
       redraw();
     });
 
@@ -820,7 +836,7 @@
       '<div class="dialog-head"><h3>Ảnh của hạng mục</h3>' +
         '<button class="icon-btn" type="button" data-close aria-label="Đóng">' + U.icon('x') + '</button></div>' +
       '<div class="dialog-body">' +
-        '<div class="dropzone" id="qi-dz">' + U.icon('upload') +
+        '<div class="dropzone" id="qi-dz" tabindex="0">' + U.icon('upload') +
           '<p><b>Chụp bằng Snipping Tool rồi bấm Ctrl+V vào đây</b><br>' +
           'hoặc kéo thả ảnh, hoặc chọn tệp</p>' +
           '<div class="btn-row" style="justify-content:center;margin-top:10px">' +
@@ -865,6 +881,7 @@
     el.addEventListener('paste', function (e) {
       if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) {
         e.preventDefault();
+        e.stopPropagation();      /* chặn lan lên document, tránh thêm ảnh hai lần */
         take(e.clipboardData.files);
       }
     });

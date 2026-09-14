@@ -1133,16 +1133,25 @@ table.qedit tr.qadd td { background: var(--surface-alt); padding: 6px 10px; }
 table.qedit tbody tr:hover { background: transparent; }
 table.qedit tr.picked:hover > td { background: var(--brand-50); }
 
+/* Ô nhập trong bảng soạn báo giá: viền rõ và nền trắng, đặt trên nền ô hơi xám
+   để nhìn một cái là biết chỗ nào gõ được. */
+table.qedit tbody td { background: var(--surface-alt); }
+
 .input-flat {
-  width: 100%; min-height: 32px; padding: 4px 6px; font-size: 13px;
-  border: 1px solid transparent; border-radius: var(--r-sm); background: transparent;
+  width: 100%; min-height: 34px; padding: 5px 7px; font-size: 13px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink);
 }
-.input-flat:hover { border-color: var(--line); }
+.input-flat::placeholder { color: var(--ink-3); }
+.input-flat:hover { border-color: var(--steel-500); }
 .input-flat:focus { outline: none; border-color: var(--brand-500); background: #fff; box-shadow: var(--ring); }
 .input-flat[readonly] { color: var(--ink-2); background: var(--surface-sunken); cursor: default; }
 
+/* Thành tiền gõ thẳng được. Khi đã gõ tay, ô đổi màu và hiện nút trả về tự tính. */
 .qamount { position: relative; white-space: nowrap; }
-.qamount .input-flat { padding-right: 26px; }
+.qamount.manual .input-flat {
+  padding-right: 26px; border-color: var(--brand-400); background: var(--brand-50); font-weight: 600;
+}
 .qlock {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 20px; height: 20px; display: grid; place-items: center;
