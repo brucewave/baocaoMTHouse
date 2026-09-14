@@ -102,7 +102,7 @@ add_action( 'wp_enqueue_scripts', 'mth_baocao_assets' );
  */
 function mth_baocao_head() {
 	$uri = get_template_directory_uri();
-	echo '<link rel="icon" href="' . esc_url( $uri . '/assets/logo.png' ) . '" type="image/png">' . "\n";
+	echo '<link rel="icon" href="' . esc_url( $uri . '/assets/favicon.png' ) . '" type="image/png" sizes="64x64">' . "\n";
 	echo '<meta name="theme-color" content="#D8451C">' . "\n";
 	echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' . "\n";
 }
