@@ -157,10 +157,7 @@
         '</form>' +
 
         '<p class="login-hint">' +
-          '<b>Tài khoản dùng thử:</b><br>' +
-          'Quản lý — <code>admin</code> / <code>admin123</code><br>' +
-          'Nhân viên — <code>nhu</code>, <code>khoa</code>, <code>ha</code>, <code>bao</code>, ' +
-          '<code>mai</code> / <code>123456</code>' +
+          'Tài khoản do quản lý cấp. Quên mật khẩu thì liên hệ quản lý để cấp lại.' +
         '</p>' +
       '</div></div>';
 
@@ -360,6 +357,46 @@
   function bindMonthSelect(root) {
     var el = U.$('#f-month', root);
     if (el) el.addEventListener('change', function () { setQ({ month: el.value }); });
+  }
+
+  /**
+   * Ba bước khởi động, chỉ hiện khi hệ thống còn trống.
+   * Tự biến mất khi đã có nhân viên, khách hàng và báo cáo đầu tiên.
+   */
+  function setupGuideHtml() {
+    if (!isAdmin()) return '';
+    var nStaff = staffList().length;
+    var nProj = S.projects.length;
+    var nRep = S.reports.length;
+    if (nStaff && nProj && nRep) return '';
+
+    var steps = [
+      [nStaff > 0, 'Thêm nhân viên và cấp tài khoản đăng nhập',
+        'Cài đặt → Nhân viên', '#/settings?tab=emp', 'Thêm nhân viên'],
+      [nProj > 0, 'Thêm khách hàng / công trình đang làm',
+        'Menu Khách hàng', '#/projects', 'Thêm khách hàng'],
+      [nRep > 0, 'Nhân viên gửi báo cáo đầu tiên',
+        'Nhân viên tự gửi, hoặc quản lý nhập hộ', '#/send', 'Nhập hộ báo cáo']
+    ];
+    var next = steps.filter(function (s) { return !s[0]; })[0];
+
+    return '<div class="card" style="border-left:4px solid var(--brand-500);margin-bottom:20px">' +
+      '<div class="card-head"><h3>Bắt đầu sử dụng</h3>' +
+        '<span class="sub">Ba bước để hệ thống chạy được với dữ liệu thật</span></div>' +
+      '<div class="card-body">' +
+        '<ol class="stage-list" style="--bar:var(--brand-600)">' +
+          steps.map(function (s, i) {
+            var cls = s[0] ? 'done' : (s === next ? 'cur' : '');
+            return '<li class="' + cls + '">' +
+              '<b>' + (s[0] ? '✓' : (i + 1)) + '</b>' +
+              '<span>' + U.esc(s[1]) +
+                '<span class="t-muted" style="font-weight:400"> · ' + U.esc(s[2]) + '</span></span>' +
+              (s[0] ? '' : '<a class="btn btn-sm' + (s === next ? ' btn-primary' : '') +
+                '" href="' + s[3] + '">' + U.esc(s[4]) + '</a>') +
+            '</li>';
+          }).join('') +
+        '</ol>' +
+      '</div></div>';
   }
 
   /** Dòng nhắc gọn khi còn báo cáo chờ duyệt chưa được tính vào số liệu */
@@ -605,6 +642,7 @@
       };
 
       var miss = [];
+      if (!data.employeeId) miss.push('nhân viên (hãy thêm nhân viên trong Cài đặt trước)');
       if (!data.date) miss.push('ngày làm việc');
       if (!data.projectId) miss.push('công trình');
       if (!data.description) miss.push('diễn giải công việc');
@@ -1200,6 +1238,7 @@
         employeePicker(empId, true) +
       '</div>' +
 
+      setupGuideHtml() +
       pendingNote(month, empId) +
 
       '<div class="print-head">' +
@@ -2538,11 +2577,10 @@
 
       '<div class="card"><div class="card-head"><h3>Xoá dữ liệu</h3></div><div class="card-body">' +
         '<div class="btn-row">' +
-          '<button class="btn btn-danger" data-wipe-demo>' + U.icon('trash') + ' Xoá dữ liệu mẫu, giữ cấu hình</button>' +
           '<button class="btn btn-danger" data-wipe-all>' + U.icon('trash') + ' Xoá sạch và tạo lại từ đầu</button>' +
         '</div>' +
-        '<p class="help" style="margin-top:10px">“Xoá dữ liệu mẫu” chỉ xoá các báo cáo minh hoạ của tháng 7/2026 và tháng 9/2026, ' +
-        'giữ nguyên nhân viên và danh mục công trình.</p>' +
+        '<p class="help" style="margin-top:10px">Xoá toàn bộ nhân viên, khách hàng, báo cáo và ảnh trên máy này, ' +
+        'đưa hệ thống về trạng thái ban đầu chỉ còn tài khoản quản lý. Hãy sao lưu trước khi dùng.</p>' +
       '</div></div>';
 
     U.on(body, 'click', '[data-backup]', function () {
@@ -2597,19 +2635,6 @@
           U.toast('Đã phục hồi dữ liệu', 'ok'); return reload();
         }).then(render).catch(function (err) { U.toast('File sao lưu không hợp lệ: ' + err.message, 'err'); });
       });
-    });
-
-    U.on(body, 'click', '[data-wipe-demo]', function () {
-      U.confirmDialog({ title: 'Xoá dữ liệu mẫu',
-        message: 'Xoá toàn bộ báo cáo minh hoạ kèm ảnh? Nhân viên, công trình và cài đặt được giữ nguyên.',
-        okText: 'Xoá dữ liệu mẫu', danger: true })
-        .then(function (ok) {
-          if (!ok) return;
-          var demo = S.reports.filter(function (r) { return r.demo; });
-          return Promise.all(demo.map(function (r) { return Store.deleteReport(r.id); }))
-            .then(function () { U.toast('Đã xoá ' + demo.length + ' báo cáo mẫu', 'ok'); return reload(); })
-            .then(render);
-        });
     });
 
     U.on(body, 'click', '[data-wipe-all]', function () {

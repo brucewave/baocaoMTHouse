@@ -882,6 +882,8 @@ tr.rowlink { cursor: pointer; }
   background: color-mix(in srgb, var(--bar) 13%, #fff);
 }
 .stage-list li.cur b { background: var(--bar); color: #fff; }
+.stage-list li .btn { margin-left: auto; flex: none; }
+.stage-list li > span { min-width: 0; }
 
 /* --- Dòng thời gian ghi chú khách hàng --- */
 .timeline { list-style: none; margin: 0; padding: 0; }

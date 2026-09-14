@@ -31,8 +31,8 @@ define( 'MTH_BAOCAO_REQUIRE_LOGIN', true );
 ```
 
 Mặc định tắt, vì dữ liệu nằm trong trình duyệt của từng người chứ không nằm trên máy chủ —
-người lạ mở vào chỉ thấy dữ liệu mẫu của chính họ, không thấy gì của công ty. Bật lên thì
-mỗi nhân viên cần một tài khoản WordPress.
+người lạ mở vào chỉ thấy một hệ thống trống, không thấy gì của công ty. Bật lên thì mỗi
+nhân viên cần một tài khoản WordPress.
 
 Theme đã tự đặt `noindex` để Google không lập chỉ mục, ẩn thanh quản trị ở mặt trước, và
 dùng `filemtime()` làm số phiên bản cho CSS/JS nên mỗi lần cập nhật là trình duyệt tải lại
@@ -46,20 +46,22 @@ nhánh `main`, thư mục `/ (root)` → Save. Sau khoảng một phút sẽ có
 cấu hình gì thêm — nhưng nhớ rằng **mỗi người mở link sẽ có dữ liệu riêng trên máy của họ**
 (xem mục 4).
 
-Đăng nhập bằng **tên đăng nhập** và **mật khẩu**. Tài khoản có sẵn khi mở lần đầu:
+Đăng nhập bằng **tên đăng nhập** và **mật khẩu**. Mở lần đầu chỉ có **một tài khoản quản lý**,
+không có dữ liệu mẫu:
 
 | Vai trò | Tên đăng nhập | Mật khẩu |
 |---|---|---|
-| Quản lý | `admin` | `admin123` |
-| Võ Thị Huỳnh Như — Kiến trúc sư | `nhu` | `123456` |
-| Trần Minh Khoa — Hoạ viên kiến trúc | `khoa` | `123456` |
-| Nguyễn Thị Thu Hà — Thiết kế nội thất | `ha` | `123456` |
-| Lê Quốc Bảo — Kỹ sư triển khai | `bao` | `123456` |
-| Phạm Ngọc Mai — Diễn hoạ 3D | `mai` | `123456` |
+| Quản lý | `admin` | `!Mthouse123` |
 
-- **Quản lý cấp tài khoản**: Cài đặt → Nhân viên → *Thêm nhân viên* (đặt tên đăng nhập và
-  mật khẩu ban đầu). Quên mật khẩu thì vào đây cấp lại.
+> Nên **đổi mật khẩu quản lý ngay sau lần đăng nhập đầu tiên**: bấm vào tên mình ở góc trên
+> bên phải → *Đổi mật khẩu*.
+
+- **Quản lý cấp tài khoản cho nhân viên**: Cài đặt → Nhân viên → *Thêm nhân viên* (đặt tên
+  đăng nhập và mật khẩu ban đầu). Quên mật khẩu thì vào đây cấp lại.
 - **Nhân viên tự đổi mật khẩu**: bấm vào tên mình ở góc trên bên phải → *Đổi mật khẩu*.
+
+Lần đầu vào, trang Tổng hợp hiện sẵn khối **Bắt đầu sử dụng** với ba bước: thêm nhân viên →
+thêm khách hàng → gửi báo cáo đầu tiên. Khối này tự biến mất khi cả ba bước đã xong.
 
 ---
 
@@ -234,29 +236,19 @@ Toàn bộ dữ liệu **nằm trong trình duyệt của máy đang mở** (Ind
 - **Hãy sao lưu định kỳ**: Cài đặt → Dữ liệu → *Tải file sao lưu (.json)*. File này chứa cả
   ảnh và phục hồi lại được trên bất kỳ máy nào.
 
-### Dữ liệu mẫu
+### Trạng thái khi mở lần đầu
 
-Lần mở đầu tiên, hệ thống tự đổ sẵn một bộ dữ liệu đầy đủ để xem được mọi màn hình:
+Không có dữ liệu mẫu. Lần mở đầu tiên hệ thống chỉ tạo:
 
-| Mục | Số lượng |
+| Mục | Nội dung |
 |---|---|
-| Nhân viên | 5 người + 1 tài khoản quản lý |
-| Hồ sơ khách hàng | 50, rải đều trên 6 bước của hành trình |
-| Lịch nhắc | ~4 quá hạn · ~4 tới hạn hôm nay · ~5 “không nhắc nữa” |
-| Ghi chú khách | ~77 mục, gồm 4 hồ sơ đã đóng với 4 lý do khác nhau |
-| Báo cáo công việc | ~400 đầu việc, trải **3 tháng gần nhất**, cả 5 nhân viên, 18 công trình |
-| Trạng thái báo cáo | phần lớn đã duyệt, ~20 chờ duyệt, vài cái bị trả lại để sửa |
+| Tài khoản | 1 tài khoản quản lý `admin` |
+| Hạng mục công việc | Kiến trúc · Nội thất · Triển khai (đổi tên được trong Cài đặt) |
+| Thông số | Ca hành chính 7h30–17h30, nghỉ trưa 12h–13h30, hệ số tăng ca 1,5 |
+| Nhân viên · Khách hàng · Báo cáo | trống — do người dùng tự nhập |
 
-Hai điểm đáng chú ý:
-
-- **Dữ liệu bám theo ngày mở trang.** Lịch nhắc và báo cáo đều tính lùi từ hôm nay, nên mở
-  lúc nào cũng thấy việc đang diễn ra chứ không phải dữ liệu chết.
-- **Tháng 7/2026 của Võ Thị Huỳnh Như được giữ nguyên từng dòng** đúng theo file Excel:
-  132 giờ HC, 30,75 giờ TC, lương 12.620.739 VNĐ — để đối chiếu kết quả tính toán.
-
-Mọi thứ đều sinh theo công thức cố định (không dùng số ngẫu nhiên) nên **ai mở cũng thấy
-cùng một bộ dữ liệu**. Khi bắt đầu dùng thật, vào **Cài đặt → Dữ liệu → Xoá dữ liệu mẫu,
-giữ cấu hình** — nhân viên, công trình và thông số được giữ lại.
+Muốn làm lại từ đầu bất cứ lúc nào: **Cài đặt → Dữ liệu → Xoá sạch và tạo lại từ đầu**
+(nhớ tải file sao lưu trước).
 
 ### Dùng chung cho cả công ty
 
@@ -291,7 +283,7 @@ BaoCaoMTHouse/
 ├── css/app.css         toàn bộ giao diện + bảng màu lấy từ logo
 └── js/
     ├── utils.js        định dạng ngày giờ, tiền, icon, hộp thoại, xuất CSV
-    ├── store.js        CSDL, tính lương, dữ liệu mẫu  ← sửa ở đây khi lên máy chủ
+    ├── store.js        CSDL, tính lương, tài khoản khởi tạo  ← sửa ở đây khi lên máy chủ
     ├── charts.js       biểu đồ cột & vành khuyên (tự vẽ, không thư viện ngoài)
     └── app.js          định tuyến, phân quyền, các màn hình
 ```
