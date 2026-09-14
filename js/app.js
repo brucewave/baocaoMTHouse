@@ -1132,7 +1132,12 @@
 
     el.addEventListener('click', function (ev) {
       if (ev.target.closest('[data-close]')) return U.closeOverlay();
-      if (ev.target.closest('[data-print]')) return window.print();
+      if (ev.target.closest('[data-print]')) {
+        /* Chỉ in đúng bảng đang mở, không in trang nằm phía sau lớp phủ */
+        document.body.classList.add('printing-fs');
+        window.print();
+        setTimeout(function () { document.body.classList.remove('printing-fs'); }, 500);
+      }
     });
     el.querySelector('[data-close]').focus();
   }

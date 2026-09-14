@@ -1011,12 +1011,14 @@ tr.rowlink { cursor: pointer; }
    IN ẤN
    ========================================================= */
 @media print {
-  @page { size: A4 landscape; margin: 12mm; }
+  /* Lề trang bằng 0 để trình duyệt không in đường dẫn file và số trang
+     ở đầu/cuối giấy. Lề thật do padding của nội dung đảm nhiệm. */
+  @page { size: A4 landscape; margin: 0; }
   body { background: #fff; background-image: none; }
   .topbar::after, .login-plan { display: none !important; }
   .page-head h2::before, .page-head h2::after { display: none; }
   .topbar, .sidebar, .bottomnav, .filterbar, .no-print, .btn, .toast-wrap { display: none !important; }
-  .main { padding: 0; }
+  .main { padding: 10mm 9mm; }
   .card { box-shadow: none; border-color: #CCC; break-inside: avoid; }
   .card + .card { margin-top: 10mm; }
   .kpi { break-inside: avoid; }
@@ -1178,13 +1180,20 @@ table.qedit tbody td { background: var(--surface-alt); }
    In riêng bản báo giá
    ========================================================= */
 @media print {
+  /* In bảng đang mở toàn màn hình */
+  body.printing-fs .app-root { display: none !important; }
+  body.printing-fs #overlay-root .fullscreen { position: static; display: block; background: #fff; }
+  body.printing-fs .fs-bar { display: none !important; }
+  body.printing-fs .fs-body { overflow: visible; padding: 10mm 9mm; }
+  body.printing-fs .fs-body table.tbl { font-size: 9px; }
+
   body.printing-quote .app-root { display: none !important; }
   body.printing-quote #overlay-root .backdrop { display: none !important; }
   body.printing-quote #overlay-root .fullscreen { position: static; display: block; background: #fff; }
   body.printing-quote .fs-bar { display: none !important; }
   body.printing-quote .fs-body { overflow: visible; }
   body.printing-quote .qsheet-wrap { padding: 0; background: #fff; }
-  body.printing-quote .qsheet { width: auto; padding: 0; }
+  body.printing-quote .qsheet { width: auto; padding: 9mm 8mm; }
   body.printing-quote .qsheet table.qtbl thead { display: table-header-group; }
   body.printing-quote .qsheet table.qtbl tr { break-inside: avoid; }
   body.printing-quote .qsheet tr.lv1, body.printing-quote .qsheet tr.lv2 { break-after: avoid; }

@@ -136,11 +136,12 @@ table.sum tr.gift td{background:var(--gift)}
 
 /* ---- in ---- */
 @media print{
-  @page{size:A4 landscape;margin:8mm}
+  /* lề 0 để trình duyệt không in đường dẫn và số trang */
+  @page{size:A4 landscape;margin:0}
   body{background:#fff}
   .bar,.note{display:none!important}
   .sheet-wrap{padding:0;overflow:visible}
-  .sheet{width:auto;box-shadow:none;padding:0}
+  .sheet{width:auto;box-shadow:none;padding:9mm 8mm}
   table.q thead{display:table-header-group}
   table.q tr{break-inside:avoid}
   tr.lv1,tr.lv2{break-after:avoid}
