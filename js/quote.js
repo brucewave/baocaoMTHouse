@@ -386,11 +386,16 @@
   var sel = {};      /* id dòng đang chọn để gộp ô */
   var pasteTarget = null;
 
+  /* Mỗi lần thêm dòng là bảng được vẽ lại, thẻ <details> sinh ra mới nên mất
+     trạng thái đang mở. Nhớ lại ở đây rồi trả về đúng lúc vẽ. */
+  var blockOpen = { info: false, extra: false };
+
   function viewEdit(main, params) {
     var q = findQuote(params.id);
     if (!q) { A.go('quotes'); return; }
     sel = {};
     pasteTarget = null;
+    blockOpen = { info: false, extra: false };
 
     /* Vẽ lại bảng nhưng KHÔNG gắn lại sự kiện — mọi handler đều uỷ quyền
        trên phần tử main, gắn đúng một lần ở dưới, nếu không mỗi lần vẽ lại
@@ -447,7 +452,8 @@
       '</div>' +
 
       /* --- thông tin chung --- */
-      '<details class="block" id="q-info"><summary>Thông tin chung ' +
+      '<details class="block" id="q-info" data-blk="info"' + (blockOpen.info ? ' open' : '') +
+        '><summary>Thông tin chung ' +
         '<span class="sub">' + U.esc(q.projectName || '') + '</span></summary>' +
         '<div class="block-body"><div class="field-row">' +
           fld('code', 'Mã báo giá', q.code) +
@@ -499,7 +505,8 @@
       '</div></div>' +
 
       /* --- phần phụ --- */
-      '<details class="block"><summary>Vật liệu, tặng kèm và ghi chú ' +
+      '<details class="block" data-blk="extra"' + (blockOpen.extra ? ' open' : '') +
+        '><summary>Vật liệu, tặng kèm và ghi chú ' +
         '<span class="sub">' + (q.legend || []).length + ' vật liệu · ' +
         (q.gifts || []).length + ' hạng mục tặng · ' + (q.notes || []).length + ' ghi chú</span></summary>' +
         '<div class="block-body">' +
@@ -658,6 +665,14 @@
       }
     });
 
+    /* toggle của <details> không lan lên, phải bắt ở pha capture */
+    main.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (d && d.tagName === 'DETAILS' && d.hasAttribute('data-blk')) {
+        blockOpen[d.getAttribute('data-blk')] = d.open;
+      }
+    }, true);
+
     /* blur không lan lên, phải bắt ở pha capture */
     main.addEventListener('blur', function (e) {
       var t = e.target;
@@ -678,13 +693,23 @@
 
     /* --- các nút --- */
     U.on(main, 'click', '[data-addrow]', function (e, b) {
-      var gid = b.getAttribute('data-addrow');
-      q.groups.forEach(function (g) { if (g.id === gid) g.rows.push(blankRow()); });
-      save(true).then(redraw);
+      var gid = b.getAttribute('data-addrow'), newId = null;
+      q.groups.forEach(function (g) {
+        if (g.id !== gid) return;
+        var r = blankRow(); g.rows.push(r); newId = r.id;
+      });
+      save(true).then(redraw).then(function () {
+        var el2 = main.querySelector('input[data-f="n"][data-r="' + newId + '"]');
+        if (el2) el2.focus();
+      });
     });
     U.on(main, 'click', '[data-addgroup]', function () {
-      q.groups.push({ id: U.uid('qg'), name: 'Khu vực mới', rows: [blankRow()] });
-      save(true).then(redraw);
+      var g = { id: U.uid('qg'), name: 'Khu vực mới', rows: [blankRow()] };
+      q.groups.push(g);
+      save(true).then(redraw).then(function () {
+        var el2 = main.querySelector('input[data-group="' + g.id + '"]');
+        if (el2) { el2.focus(); el2.select(); }
+      });
     });
     U.on(main, 'click', '[data-delgroup]', function (e, b) {
       var gid = b.getAttribute('data-delgroup');
@@ -759,9 +784,13 @@
     /* --- danh sách phụ --- */
     U.on(main, 'click', '[data-liadd]', function (e, b) {
       var k = b.getAttribute('data-liadd');
-      if (k === 'legend') (q.legend = q.legend || []).push({ text: '' });
-      else (q[k] = q[k] || []).push('');
-      save(true).then(redraw);
+      var arr = k === 'legend' ? (q.legend = q.legend || []) : (q[k] = q[k] || []);
+      arr.push(k === 'legend' ? { text: '' } : '');
+      var idx = arr.length - 1;
+      save(true).then(redraw).then(function () {
+        var el2 = main.querySelector('[data-li="' + k + ':' + idx + '"]');
+        if (el2) el2.focus();
+      });
     });
     U.on(main, 'click', '[data-lidel]', function (e, b) {
       var p = b.getAttribute('data-lidel').split(':');
