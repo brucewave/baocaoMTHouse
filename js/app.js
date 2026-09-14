@@ -118,6 +118,34 @@
   /* =========================================================
      ĐĂNG NHẬP
      ========================================================= */
+  /** Ô mật khẩu kèm nút con mắt để kiểm tra mình gõ đúng chưa */
+  function passField(id, label, autocomplete, help) {
+    return '<div class="field">' +
+        '<label for="' + id + '">' + label + '</label>' +
+        '<div class="pass-wrap">' +
+          '<input class="input" type="password" id="' + id + '" autocomplete="' + autocomplete + '">' +
+          '<button class="pass-eye" type="button" data-eye="' + id + '" ' +
+            'aria-label="Hiện mật khẩu" aria-pressed="false">' + U.icon('eye') + '</button>' +
+        '</div>' +
+        (help ? '<span class="help">' + help + '</span>' : '') +
+      '</div>';
+  }
+
+  /* Bấm con mắt thì đổi giữa che và hiện. Gắn một lần trên document nên
+     dùng được cho mọi ô mật khẩu, kể cả ô nằm trong hộp thoại. */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-eye]');
+    if (!b) return;
+    var inp = document.getElementById(b.getAttribute('data-eye'));
+    if (!inp) return;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    b.setAttribute('aria-pressed', String(show));
+    b.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    b.innerHTML = U.icon(show ? 'eyeOff' : 'eye');
+    inp.focus();
+  });
+
   function renderLogin() {
     revokeUrls();
     var app = document.getElementById('app');
@@ -146,12 +174,15 @@
           '<div class="field">' +
             '<label for="lg-user">Tên đăng nhập <span class="req">*</span></label>' +
             '<input class="input" id="lg-user" autocomplete="username" autocapitalize="off" ' +
-              'spellcheck="false" placeholder="vd: nhu" required autofocus>' +
+              'spellcheck="false" required autofocus>' +
           '</div>' +
           '<div class="field">' +
             '<label for="lg-pass">Mật khẩu <span class="req">*</span></label>' +
-            '<input class="input" id="lg-pass" type="password" autocomplete="current-password" ' +
-              'placeholder="••••••" required>' +
+            '<div class="pass-wrap">' +
+              '<input class="input" id="lg-pass" type="password" autocomplete="current-password" required>' +
+              '<button class="pass-eye" type="button" data-eye="lg-pass" ' +
+                'aria-label="Hiện mật khẩu" aria-pressed="false">' + U.icon('eye') + '</button>' +
+            '</div>' +
             '<span class="err" id="lg-err" hidden></span>' +
           '</div>' +
           '<button class="btn btn-primary btn-lg btn-block" type="submit">' + U.icon('check') + ' Đăng nhập</button>' +
@@ -206,13 +237,14 @@
           '<span class="help">Tên đăng nhập do quản lý cấp, không tự đổi được.</span></div>' +
         '<h4 style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
           'color:var(--ink-3);margin:22px 0 12px">Đổi mật khẩu</h4>' +
-        '<div class="field"><label for="ac-old">Mật khẩu hiện tại <span class="req">*</span></label>' +
-          '<input class="input" type="password" id="ac-old" autocomplete="current-password"></div>' +
-        '<div class="field"><label for="ac-new">Mật khẩu mới <span class="req">*</span></label>' +
-          '<input class="input" type="password" id="ac-new" autocomplete="new-password">' +
-          '<span class="help">Ít nhất 6 ký tự.</span></div>' +
+        passField('ac-old', 'Mật khẩu hiện tại <span class="req">*</span>', 'current-password') +
+        passField('ac-new', 'Mật khẩu mới <span class="req">*</span>', 'new-password', 'Ít nhất 6 ký tự.') +
         '<div class="field"><label for="ac-new2">Nhập lại mật khẩu mới <span class="req">*</span></label>' +
-          '<input class="input" type="password" id="ac-new2" autocomplete="new-password">' +
+          '<div class="pass-wrap">' +
+            '<input class="input" type="password" id="ac-new2" autocomplete="new-password">' +
+            '<button class="pass-eye" type="button" data-eye="ac-new2" ' +
+              'aria-label="Hiện mật khẩu" aria-pressed="false">' + U.icon('eye') + '</button>' +
+          '</div>' +
           '<span class="err" id="ac-err" hidden></span></div>' +
       '</div>' +
       '<div class="dialog-foot"><button class="btn" type="button" data-close>Đóng</button>' +

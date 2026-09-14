@@ -398,6 +398,19 @@ table { border-collapse: collapse; }
 }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s4); }
 
+/* Ô mật khẩu kèm nút con mắt */
+.pass-wrap { position: relative; }
+.pass-wrap .input { padding-right: 46px; }
+.pass-eye {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink-3); cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.pass-eye:hover { background: var(--surface-sunken); color: var(--brand-700); }
+.pass-eye[aria-pressed="true"] { color: var(--brand-600); }
+.pass-eye svg { width: 19px; height: 19px; }
+
 /* Nhóm chọn hạng mục */
 .segmented { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }

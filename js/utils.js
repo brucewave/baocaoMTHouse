@@ -223,7 +223,9 @@
     handshake:'<path d="m11 6 3.5-1.5L21 9v6l-3 2-4-3.5"/><path d="M13 7.5 9.5 5 3 9v6l3 2 3.5-3"/><path d="m9.5 12 2.5 2 2-1.5"/>',
     /* Mặt bằng đơn giản: tường, vách ngăn, cánh cửa mở và ô cửa sổ */
     floorplan:'<path d="M2.5 3.5h19v17h-19z"/><path d="M2.5 12.5h6M9.5 3.5v9M9.5 12.5h12M14.5 12.5v8"/><path d="M18.5 20.5a4 4 0 0 0-4-4"/><path d="M13.5 3.5h4"/>',
-    ruler:    '<path d="M3 8.5h18v7H3z"/><path d="M7 8.5v3M11 8.5v4M15 8.5v3M19 8.5v4"/>'
+    ruler:    '<path d="M3 8.5h18v7H3z"/><path d="M7 8.5v3M11 8.5v4M15 8.5v3M19 8.5v4"/>',
+    eye:      '<path d="M2 12s3.7-6.5 10-6.5S22 12 22 12s-3.7 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff:   '<path d="M10.7 6.2A10.6 10.6 0 0 1 12 6c6.3 0 10 6 10 6a18.4 18.4 0 0 1-3.1 3.7"/><path d="M6.4 7.9A17.7 17.7 0 0 0 2 12s3.7 6.5 10 6.5c1.2 0 2.3-.15 3.3-.42"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/>'
   };
 
   function icon(name, cls) {
