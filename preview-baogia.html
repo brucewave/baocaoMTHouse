@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MT HOUSE — Preview bảng báo giá</title>
+<link rel="icon" href="assets/logo.png" type="image/png">
+<style>
+/* =========================================================
+   Preview bảng báo giá — dựng lại đúng bố cục file Excel/PDF
+   của MT House. Khi duyệt xong, phần CSS này chuyển vào
+   css/app.css, phần dữ liệu do người dùng nhập trên web.
+   ========================================================= */
+:root{
+  --paper:#FFFFFF; --ink:#1A1A1A; --muted:#5A5A5A;
+  --grid:#B7B7B7;                 /* nét kẻ bảng */
+  --head:#8EA2C3;                 /* nền hàng tiêu đề */
+  --head-stt:#7F6000;             /* ô STT trong tiêu đề */
+  --lv1:#FFD966;                  /* hàng cấp 1 */
+  --lv1-stt:#BF8F00;
+  --lv2:#DDEBF7;                  /* hàng cấp 2 */
+  --pending:#FFF2CC;              /* ô thành tiền chưa chốt */
+  --total:#948A54;                /* hàng tổng cộng */
+  --gift:#C6E0B4;                 /* hàng tặng kèm */
+  --brand:#D8451C;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;background:#EFEDEA;color:var(--ink);
+  font:400 14px/1.5 "Segoe UI",system-ui,Arial,sans-serif;
+}
+
+/* ---- thanh công cụ, không in ---- */
+.bar{
+  position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;
+  padding:12px 20px;background:#fff;border-bottom:1px solid #DCD8D3;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.bar img{height:26px;width:auto}
+.bar h1{font-size:15px;font-weight:700;margin:0}
+.bar .sub{font-size:12.5px;color:var(--muted)}
+.bar .grow{flex:1}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 16px;
+  border:1px solid #C9C4BE;border-radius:8px;background:#fff;color:var(--ink);
+  font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:none;
+}
+.btn:hover{background:#F5F3F1}
+.btn-primary{background:var(--brand);border-color:#B03318;color:#fff}
+.btn-primary:hover{background:#B03318}
+.note{
+  max-width:1120px;margin:18px auto 0;padding:12px 16px;border-radius:8px;
+  background:#EAF2FC;border:1px solid #C7DCF5;color:#1D4E88;font-size:13.5px;line-height:1.55;
+}
+.note b{font-weight:700}
+.note.warn{background:#FFF6E0;border-color:#F0DCAE;color:#7A5200}
+
+/* ---- tờ giấy A4 ngang ---- */
+.sheet-wrap{padding:18px;overflow-x:auto}
+.sheet{
+  width:1120px;margin:0 auto;background:var(--paper);
+  padding:14px 16px 20px;box-shadow:0 2px 14px rgba(0,0,0,.12);
+  font-size:10.5px;line-height:1.35;
+}
+
+/* ---- đầu trang ---- */
+.doc-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:12px}
+.doc-head .co{flex:1}
+.doc-head .co h2{font-size:14px;font-weight:700;margin:0 0 3px;letter-spacing:.01em}
+.doc-head .co p{margin:0;font-size:10px;color:#333}
+.doc-head .logo{width:130px;text-align:center;flex:none}
+.doc-head .logo img{width:110px;height:auto}
+.doc-head .rt{width:230px;text-align:right;flex:none}
+.doc-head .rt h3{font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:.01em}
+.doc-head .rt p{margin:0;font-size:10px;font-weight:700}
+.doc-head .rt p span{font-weight:400}
+
+/* ---- khối thông tin khách hàng ---- */
+table.info{width:100%;border-collapse:collapse;margin-bottom:10px}
+table.info td{border:1px solid var(--grid);padding:4px 8px;font-size:10.5px;font-weight:700}
+table.info td:first-child{width:250px}
+
+/* ---- bảng chính ---- */
+table.q{width:100%;border-collapse:collapse;table-layout:fixed}
+table.q th,table.q td{border:1px solid var(--grid);padding:4px 5px;vertical-align:middle}
+table.q thead th{
+  background:var(--head);color:#1A1A1A;font-size:10px;font-weight:700;text-align:center;height:26px;
+}
+table.q thead th.stt{background:var(--head-stt);color:#fff}
+.c{text-align:center}
+.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.b{font-weight:700}
+
+tr.lv1 td{background:var(--lv1);font-weight:700;height:24px}
+tr.lv1 td.stt{background:var(--lv1-stt);color:#fff;text-align:center}
+tr.lv2 td{background:var(--lv2);font-weight:700;height:22px}
+
+td.pending{background:var(--pending)}
+
+/* ảnh sản phẩm */
+.ph{
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;
+  min-height:64px;border:1px dashed #C2BDB7;border-radius:3px;background:#F7F5F3;
+  color:#9A948D;font-size:9.5px;text-align:center;padding:6px;
+}
+.ph svg{width:18px;height:18px}
+.ph.tall{min-height:120px}
+
+.multi{white-space:pre-line}
+.spec{font-size:9.5px;color:#444;display:block}
+
+/* ---- chân trang ---- */
+.legend-title{font-size:10.5px;font-weight:700;margin:14px 0 5px}
+table.legend{width:100%;border-collapse:collapse}
+table.legend td{border:1px solid var(--grid);padding:6px;text-align:center;font-size:10px;width:16.66%}
+table.legend .sw{
+  height:56px;border-radius:2px;margin-bottom:5px;background:#DED8D0;
+  display:flex;align-items:center;justify-content:center;color:#8A837B;font-size:9px;
+}
+
+table.sum{width:100%;border-collapse:collapse;margin-top:10px}
+table.sum td{border:1px solid var(--grid);padding:6px 8px;font-size:11px;font-weight:700}
+table.sum tr.total td{background:var(--total);color:#fff;text-align:center;height:26px}
+table.sum tr.total td.money{text-align:right;font-size:12.5px}
+table.sum tr.gift td{background:var(--gift)}
+
+.foot-note{margin-top:12px;font-size:10px;line-height:1.6}
+.foot-note b{display:block;margin-bottom:3px}
+.foot-note ul{margin:0;padding-left:16px}
+
+.sign{display:flex;justify-content:space-between;margin-top:26px;font-size:10.5px}
+.sign > div{text-align:center;width:46%}
+.sign b{display:block;font-weight:700}
+.sign .role{margin-top:4px;font-weight:700}
+.sign .name{margin-top:52px;font-weight:700}
+
+/* ---- in ---- */
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body{background:#fff}
+  .bar,.note{display:none!important}
+  .sheet-wrap{padding:0;overflow:visible}
+  .sheet{width:auto;box-shadow:none;padding:0}
+  table.q thead{display:table-header-group}
+  table.q tr{break-inside:avoid}
+  tr.lv1,tr.lv2{break-after:avoid}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <img src="assets/logo-wide.png" alt="MT House">
+  <div>
+    <h1>Preview bảng báo giá</h1>
+    <div class="sub">Bản dựng thử bố cục — chưa nối vào hệ thống</div>
+  </div>
+  <div class="grow"></div>
+  <button class="btn btn-primary" onclick="window.print()">In / Lưu PDF</button>
+</div>
+
+<div class="note">
+  Đây là <b>bản xem trước bố cục</b>, dựng lại theo file
+  <i>MThouse_ChiThuDung_Quan9_VillaVuon_BaoGia_Noithat</i>. Số liệu lấy nguyên từ file đó.
+  Khi làm thành tính năng, anh chỉ nhập <b>hạng mục · kích thước · vật liệu · ĐVT · số lượng ·
+  đơn giá</b> rồi tải ảnh lên — phần đánh số, cộng tổng theo khu vực, cộng tổng toàn bộ và
+  bố cục in đều tự động.
+</div>
+
+<div class="note warn" id="check"></div>
+
+<div class="sheet-wrap">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+/* =========================================================
+   Dữ liệu báo giá — lấy nguyên từ file PDF
+   n  hạng mục      s  kích thước      m  mô tả chất liệu
+   u  ĐVT           q  số lượng        nc đơn giá nhân công
+   vt đơn giá vật tư                   one đơn giá gộp hai cột
+   t  thành tiền (null = chưa chốt)    g  ghi chú
+   img số hàng mà ô ảnh trải qua (0 = hàng đã bị ô ảnh phía trên phủ)
+   ========================================================= */
+var QUOTE = {
+  company: {
+    name: "CÔNG TY TNHH KIẾN TRÚC VÀ XÂY DỰNG MTHOUSE",
+    office: "Office : 15, 24B, PHƯỜNG AN PHÚ, QUẬN 2, TP HCM",
+    web: "[W] : http://mthouse.vn/ _ [FB] : Mthouse",
+    director: "NGUYỄN PHƯƠNG VŨ"
+  },
+  code: "MThouse_VillaVuon_Q9",
+  date: "3/31/2026",
+  customer: "Chị Thu Dung",
+  project: "VillaVuon nhà chị Thu Dung",
+  items: "THI CÔNG HOÀN THIỆN NỘI THẤT",
+  vat: 8,
+  title: "Hoàn thiện trang trí nội thất và trang trí décor",
+  groups: [
+    ["Phòng khách , Bàn ăn và Bếp", [
+      {n:"Tủ bao tủ lạnh và tủ trang trí", s:"2355x3000x(450-900)", u:"bộ", q:1.0, vt:29610000, t:29610000, img:4},
+      {n:"Tủ thấp trang trí mặt trên ốp đá trắng sứ", s:"2400x550x420", u:"bộ", q:1.0, vt:14640000, t:null, img:0},
+      {n:"Sofa góc - bọc vải nhung cao câp theo thiết kế", s:"1970x2720x900", u:"bộ", q:1.0, vt:38000000, t:38000000, img:0},
+      {n:"Bàn trà - gỗ tự nhiên (1 bàn phi 600 và 1 bàn phi 400)", u:"bộ", q:1.0, vt:12000000, t:12000000, img:0},
+      {n:"Tủ thấp vách tivi , phủ đá trắng sứ mặt trên tủ", s:"5890x530x730", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:28272000, t:28272000, img:2},
+      {n:"Tủ cao vách tivi", s:"5900x2280x300", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:43046400, t:43046400, img:0},
+      {n:"Bếp Dưới (thùng chậu rửa phủ 1 lớp compact chống nước)", s:"3776x860x600", m:"ván Plywood sơn hoàn thiện", u:"md", q:3.8, vt:5600000, t:21112000, img:6},
+      {n:"Bếp Trên cấp 1", s:"3776x700x350", m:"ván Plywood sơn hoàn thiện", u:"md", q:3.8, vt:6600000, t:24882000, img:0},
+      {n:"Bếp Trên cấp 2", s:"3776x800x600", m:"ván Plywood sơn hoàn thiện", u:"md", q:3.8, vt:6800000, t:25636000, img:0},
+      {n:"Đảo góc L", s:"1160x860x700", m:"ván Plywood sơn hoàn thiện", u:"md", q:1.2, vt:5600000, t:6496000, img:0},
+      {n:"", s:"2965x860x910", m:"ván Plywood sơn hoàn thiện", u:"md", q:3.0, vt:6900000, t:20424000, img:0},
+      {n:"Đá tường ốp bếp và Đá mặt bếp - trắng sứ không vân", u:"m2", q:14.4, vt:4571429, t:65939200, img:0},
+      {n:"Ghế bàn bar - kích thước chiều cao ghế theo mặt bàn đảo bar thấp số 1", m:"gỗ tự nhiên kết hợp bọc đệm và vải nhung", u:"bộ", q:4.0, vt:3600000, t:14400000, img:1},
+      {n:"Bàn ăn - gỗ tự nhiên chân và mặt bàn", u:"bộ", q:1.0, vt:24000000, t:24000000, img:2},
+      {n:"Ghế ăn - khung gỗ tự nhiên bọc vải nhung cao cấp", u:"bộ", q:6.0, vt:3900000, t:23400000, img:0}
+    ]],
+    ["Phòng ngủ Master", [
+      {n:"Giường ngủ bọc vải nhung cao cấp", s:"1800x2000", m:"bọc vải nhung Cỏ May cao cấp", u:"bộ", q:1.0, vt:18600000, t:18600000, img:2},
+      {n:"Táp đầu giường", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:2.0, vt:3800000, t:7600000, img:0},
+      {n:"Bộ bàn trang điểm:\n1. bàn và tủ trang điểm\n2. kính thủy + khung gương\n3. ghế trang điểm", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:42864000, t:42864000, img:2},
+      {n:"Bộ bàn ghế uống trà\n1. bàn trà\n2. ghế sofa đơn", u:"bộ", q:1.0, vt:22800000, t:null, img:0},
+      {n:"Tủ áo 1", s:"2100x2800x600", m:"ván Plywood sơn hoàn thiện", u:"m2", q:5.9, vt:3910000, t:22990800, img:2},
+      {n:"Tủ áo 2", s:"5560x2800x600", m:"ván Plywood sơn hoàn thiện", u:"m2", q:15.6, vt:3910000, t:60870880, img:0},
+      {n:"Bộ tủ và gương lavabo - master\n1. Tủ gỗ nhựa WPB An Cường\n2. Mặt đá\n3. Gương thủy có cánh và thùng gỗ nhựa WPB An Cường", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:31360000, t:31360000, img:1}
+    ]],
+    ["Phòng ngủ em Phương", [
+      {n:"Tủ trang trí đồ chơi", s:"2800x2120x470", m:"ván Plywood sơn hoàn thiện, cánh nhôm kính", u:"bộ", q:1.0, vt:36252000, t:36252000, img:1},
+      {n:"Khu vực bàn làm việc và kệ trang trí (không bao gồm ghế)", s:"1854x2800x550(1200)", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:22000000, t:22000000, img:3},
+      {n:"Giường ngủ bọc vải nhung cao cấp (không bao gồm nệm)", s:"nệm (1600x2000)", m:"bọc vải nhung Cỏ May cao cấp", u:"bộ", q:1.0, vt:17800000, t:17800000, img:0},
+      {n:"Tủ đầu giường", s:"650x600x480", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:3800000, t:3800000, img:0},
+      {n:"Tủ áo", s:"2800x1586x600", m:"ván Plywood sơn hoàn thiện", u:"m2", q:4.4, vt:3910000, t:17363528, img:2},
+      {n:"Gương soi khung gỗ tự nhiên (kích thước 400x1600 toàn thân theo phối cảnh)", s:"400x1600", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:2800000, t:2800000, img:0}
+    ]],
+    ["Phòng ngủ em Tí", [
+      {n:"Giường ngủ bọc vải nhung cao cấp (không bao gồm nệm)", s:"nệm (1600x2000)", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:17800000, t:17800000, img:3},
+      {n:"Tủ đầu giường", m:"bọc vải nhung Cỏ May cao cấp", u:"bộ", q:1.0, vt:3800000, t:3800000, img:0},
+      {n:"Khung gỗ và kệ tủ đầu giường", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:12000000, t:12000000, img:0},
+      {n:"Tủ áo kết hợp với kệ trang trí (số 1)", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:17700000, t:17700000, img:1},
+      {n:"Tủ áo", m:"ván Plywood sơn hoàn thiện", u:"m2", q:6.1, vt:3910000, t:23811900, img:2},
+      {n:"Bàn làm việc kết hợp với tủ", m:"ván Plywood sơn hoàn thiện", u:"bộ", q:1.0, vt:16000000, t:16000000, img:0}
+    ]],
+    ["Khu vực giặt sấy", [
+      {n:"Tủ giặt sấy", m:"Ván compact sơn hoàn thiện", u:"bộ", q:1.0, vt:17800000, t:17800000, img:1}
+    ]],
+    ["HẠNG MỤC PHỤ KIỆN VÀ LED", [
+      {n:"Tay nắm cửa", u:"bộ", q:1.0, vt:10000000, t:10000000, img:1},
+      {n:"Phụ kiện bếp", u:"gói", q:1.0, one:20000000, t:20000000, g:"Chi tiết thống nhất với chủ nhà\nTạm tính", img:1},
+      {n:"Led dán 2835-12V 180 led/mét DH", spec:"Công suất : 13w/mét\nÁnh sáng : 4000k trung tính\nCuộn 5 mét", u:"Cuộn", q:5, nc:"-", vt:239000, t:1195000, img:1},
+      {n:"Thanh nhôm profile âm 508A", spec:"Độ dài : 1 thanh 2 mét", u:"Mét", q:15, nc:"-", vt:48000, t:720000, img:1},
+      {n:"Cục nguồn Aishi 12V - 200w", spec:"Công suất : 200w", u:"Cái", q:5, nc:"-", vt:390000, t:1950000, img:1},
+      {n:"Cục nguồn Aishi 12V - 300w", spec:"Công suất : 300w", u:"Cái", q:5, nc:"-", vt:480000, t:2400000, img:1},
+      {n:"Led neon 5M-12VDH", spec:"Ánh sáng : 3000k vàng", u:"Cuộn", q:3, nc:"-", vt:220000, t:660000, img:1},
+      {n:"Cảm biến cham 12V-24V DH", u:"Cái", q:8, nc:"-", vt:150000, t:1200000, img:1},
+      {n:"Cục nguồn Aishi 12V - 100w", spec:"Công suất : 100w", u:"Cái", q:5, nc:"-", vt:320000, t:1600000, img:1},
+      {n:"Dây điện sub đỏ đen đi led 2 x 0.3", u:"Mét", q:30, nc:"-", vt:3000, t:90000, img:1},
+      {n:"Bản lề - Hafele", u:"cái", q:110, nc:"-", vt:28000, t:3080000, img:2},
+      {n:"Ray Bi Giảm Chấn 450mm Hafele 494.02.064", u:"bộ", q:30, nc:"-", vt:230000, t:6900000, img:0},
+      {n:"Ray Âm EPC Evo 500mm Giảm Chấn Hafele 433.32.075", u:"bộ", q:20, nc:"-", vt:440000, t:8800000, img:1}
+    ]],
+    ["HẠNG MỤC CỬA ĐI CÁC PHÒNG VÀ CỬA TOILET", [
+      {n:"CỬA PHÒNG VÀ CỬA TOILET (theo phối cảnh)", u:"bộ", q:8.0, one:6500000, t:52000000, img:1},
+      {n:"Bộ khóa tay, ruột và thân khóa + chặn cửa", u:"bộ", q:8.0, one:1900000, t:15200000, img:1}
+    ]]
+  ],
+  legend: ["Đệm mút D40 chống xẹp lún","Cốt ván Plywood phủ Birch","Cánh kính khung nhôm",
+           "Gỗ Tần Bì tự nhiên","Sơn gỗ gốc nước","Ván compact"],
+  gifts: ["Tranh theo thiết kế","Rèm cửa (3 phòng ngủ, cửa sổ phòng khách)"],
+  notes: [
+    "Chi phí sẽ được thay đổi điều chỉnh theo chất liệu hoàn thiện và theo phương án thiết kế hoàn thiện mong muốn của chủ đầu tư",
+    "Khối lượng tính theo đơn vị md, m2 sẽ được kiểm tra đo đạc theo thực tế thi công hoàn thiện (với đơn vị m2 cho hạng mục diện tích sàn sử dụng tường bao)",
+    "Đơn giá chỉ có thể thay đổi do biến động giá vật liệu và trang thiết bị điện nước. (đơn giá này chỉ có hiệu lực trong khoản thời gian 15 ngày kể từ ngày báo giá.)"
+  ],
+  /* con số gõ tay ở ô tổng cộng trong file Excel gốc, để đối chiếu */
+  excelTotal: 896071900
+};
+
+function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function money(v){return v==null?"":Number(v).toLocaleString("en-US");}
+function qty(v){return v==null?"":Number(v).toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:2});}
+function imgIcon(){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">' +
+    '<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.8"/>' +
+    '<path d="m3.5 17 5-5 4.5 4.5 3-2.5 4.5 4"/></svg>';
+}
+
+function render(){
+  var Q = QUOTE, html = "";
+
+  html +=
+    '<div class="doc-head">' +
+      '<div class="co"><h2>' + esc(Q.company.name) + '</h2>' +
+        '<p>' + esc(Q.company.office) + '</p><p>' + esc(Q.company.web) + '</p></div>' +
+      '<div class="logo"><img src="assets/logo.png" alt="MT House"></div>' +
+      '<div class="rt"><h3>BÁO GIÁ CHI TIẾT</h3>' +
+        '<p>' + esc(Q.code) + '</p>' +
+        '<p>Ngày: <span>' + esc(Q.date) + '</span></p></div>' +
+    '</div>';
+
+  html +=
+    '<table class="info"><tbody>' +
+      '<tr><td>KHÁCH HÀNG/ Customer</td><td>' + esc(Q.customer) + '</td></tr>' +
+      '<tr><td>CÔNG TRÌNH/ Project</td><td>' + esc(Q.project) + '</td></tr>' +
+      '<tr><td>HẠNG MỤC/ Items</td><td>' + esc(Q.items) + '</td></tr>' +
+    '</tbody></table>';
+
+  var subTotals = Q.groups.map(function(g){
+    return g[1].reduce(function(s,r){ return s + (r.t || 0); }, 0);
+  });
+  var grand = subTotals.reduce(function(s,v){ return s + v; }, 0);
+
+  html +=
+    '<table class="q"><colgroup>' +
+      '<col style="width:3.6%"><col style="width:18.5%"><col style="width:8.5%"><col style="width:11.5%">' +
+      '<col style="width:20%"><col style="width:3.6%"><col style="width:5%">' +
+      '<col style="width:6%"><col style="width:6%"><col style="width:8.4%"><col style="width:5.4%">' +
+    '</colgroup><thead>' +
+      '<tr>' +
+        '<th class="stt" rowspan="2">STT</th>' +
+        '<th rowspan="2">HẠNG MỤC</th>' +
+        '<th rowspan="2">Kích thước</th>' +
+        '<th rowspan="2">Mô tả chất liệu</th>' +
+        '<th rowspan="2">HÌNH ẢNH</th>' +
+        '<th rowspan="2">ĐVT</th>' +
+        '<th rowspan="2">SỐ LƯỢNG</th>' +
+        '<th colspan="2">ĐƠN GIÁ</th>' +
+        '<th rowspan="2">THÀNH TIỀN</th>' +
+        '<th rowspan="2">GHI CHÚ</th>' +
+      '</tr>' +
+      '<tr><th>nhân công</th><th>vật tư</th></tr>' +
+    '</thead><tbody>';
+
+  html +=
+    '<tr class="lv1"><td class="stt">1</td>' +
+      '<td colspan="8">' + esc(Q.title) + '</td>' +
+      '<td class="r">' + money(grand) + '</td><td></td></tr>';
+
+  Q.groups.forEach(function(g, gi){
+    html +=
+      '<tr class="lv2"><td class="c">1.' + (gi + 1) + '</td>' +
+        '<td colspan="8">' + esc(g[0]) + '</td>' +
+        '<td class="r">' + money(subTotals[gi]) + '</td><td></td></tr>';
+
+    g[1].forEach(function(r, ri){
+      var span = (r.img == null) ? 1 : r.img;
+      html += '<tr>' +
+        '<td class="c">1.' + (gi + 1) + '.' + (ri + 1) + '</td>' +
+        '<td class="multi">' + esc(r.n) +
+          (r.spec ? '<span class="spec">' + esc(r.spec) + '</span>' : "") + '</td>' +
+        '<td class="b">' + esc(r.s || "") + '</td>' +
+        '<td class="b">' + esc(r.m || "") + '</td>' +
+        (span > 0
+          ? '<td rowspan="' + span + '"><div class="ph' + (span > 1 ? " tall" : "") + '">' +
+            imgIcon() + '<span>Ảnh sản phẩm</span></div></td>'
+          : "") +
+        '<td class="c">' + esc(r.u || "") + '</td>' +
+        '<td class="c">' + qty(r.q) + '</td>' +
+        (r.one != null
+          ? '<td class="c b" colspan="2">' + money(r.one) + '</td>'
+          : '<td class="r">' + (r.nc === "-" ? "-" : money(r.nc)) + '</td>' +
+            '<td class="r">' + money(r.vt) + '</td>') +
+        '<td class="r' + (r.t == null ? " pending" : "") + '">' + money(r.t) + '</td>' +
+        '<td class="c multi" style="font-size:9.5px">' + esc(r.g || "") + '</td>' +
+      '</tr>';
+    });
+  });
+
+  html += '</tbody></table>';
+
+  html += '<div class="legend-title">Giải thích vật liệu nội thất và phụ kiện đã bao gồm báo giá</div>' +
+    '<table class="legend"><tbody><tr>' +
+      Q.legend.map(function(t){
+        return '<td><div class="sw">ảnh vật liệu</div>' + esc(t) + '</td>';
+      }).join("") +
+    '</tr></tbody></table>';
+
+  html += '<table class="sum"><tbody>' +
+      '<tr class="total"><td>Thành tiền (chưa bao gồm ' + Q.vat + '% VAT)</td>' +
+        '<td style="width:70px">VNĐ</td>' +
+        '<td class="money" style="width:150px">' + money(grand) + '</td>' +
+        '<td style="width:130px">đã làm tròn số</td></tr>' +
+      '<tr class="gift"><td class="c" style="width:44px">A</td><td colspan="3">Các hạng mục tặng kèm</td></tr>' +
+      Q.gifts.map(function(t, i){
+        return '<tr><td class="c">a' + (i + 1) + '</td><td colspan="3">' + esc(t) + '</td></tr>';
+      }).join("") +
+    '</tbody></table>';
+
+  html += '<div class="foot-note"><b>Ghi chú:</b><ul>' +
+      Q.notes.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") +
+    '</ul></div>';
+
+  html += '<div class="sign">' +
+      '<div><b>CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG VÀ THIẾT KẾ MT HOUSE</b>' +
+        '<div class="role">GIÁM ĐỐC/ DIRECTOR</div>' +
+        '<div class="name">' + esc(Q.company.director) + '</div></div>' +
+      '<div><b>CHỦ ĐẦU TƯ/ CONFIRM BY OWNER</b>' +
+        '<div class="role">&nbsp;</div>' +
+        '<div class="name">' + esc(Q.customer) + '</div></div>' +
+    '</div>';
+
+  document.getElementById("sheet").innerHTML = html;
+
+  var diff = grand - Q.excelTotal;
+  document.getElementById("check").innerHTML =
+    "Máy tự cộng ra <b>" + money(grand) + " VNĐ</b>, còn ô tổng cộng gõ tay trong file Excel ghi <b>" +
+    money(Q.excelTotal) + " VNĐ</b> — lệch <b>" + money(Math.abs(diff)) + " VNĐ</b>. " +
+    "Số máy cộng khớp đúng với hàng “1 Hoàn thiện trang trí nội thất” ở đầu bảng, " +
+    "nên nhiều khả năng ô tổng trong file Excel bị gõ sai. Làm trên web thì tổng luôn tự cộng, không lệch được.";
+}
+render();
+</script>
+</body>
+</html>

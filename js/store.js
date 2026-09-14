@@ -7,7 +7,7 @@
   'use strict';
 
   var DB_NAME = 'mthouse_report';
-  var DB_VER = 1;
+  var DB_VER = 2;
   var SEED_VERSION = 7;   /* tăng số này khi đổi cấu trúc dữ liệu khởi tạo */
   var db = null;
 
@@ -59,7 +59,8 @@
     projects:   { keyPath: 'id' },
     categories: { keyPath: 'id' },
     reports:    { keyPath: 'id', indexes: [['date', 'date'], ['employeeId', 'employeeId'], ['status', 'status']] },
-    images:     { keyPath: 'id', indexes: [['reportId', 'reportId']] }
+    images:     { keyPath: 'id', indexes: [['reportId', 'reportId']] },
+    quotes:     { keyPath: 'id', indexes: [['projectId', 'projectId'], ['date', 'date']] }
   };
 
   function open() {
@@ -136,6 +137,26 @@
 
   function deleteReport(id) {
     return deleteImagesOf(id).then(function () { return del('reports', id); });
+  }
+
+  /* =========================================================
+     Báo giá
+     Ảnh của báo giá dùng chung kho images, khoá theo 'q:<id dòng>'
+     để tận dụng luôn chỉ mục reportId sẵn có.
+     ========================================================= */
+  function saveQuote(q) {
+    q.updatedAt = Date.now();
+    if (!q.id) { q.id = U.uid('qt'); q.createdAt = Date.now(); }
+    return put('quotes', q).then(function () { return q; });
+  }
+
+  function deleteQuote(q) {
+    var ids = [];
+    (q.groups || []).forEach(function (g) {
+      (g.rows || []).forEach(function (r) { ids.push('q:' + r.id); });
+    });
+    (q.legend || []).forEach(function (l, i) { ids.push('q:legend:' + q.id + ':' + i); });
+    return Promise.all(ids.map(deleteImagesOf)).then(function () { return del('quotes', q.id); });
   }
 
   /* =========================================================
@@ -307,6 +328,7 @@
     ready: ready, seed: seed, resetAll: resetAll,
     all: all, get: get, put: put, del: del, putMany: putMany, clear: clearStore,
     settings: settings, saveReport: saveReport, deleteReport: deleteReport,
+    saveQuote: saveQuote, deleteQuote: deleteQuote,
     addImage: addImage, imagesOf: imagesOf, deleteImagesOf: deleteImagesOf,
     hourlyRate: hourlyRate, payroll: payroll,
     STAGES: STAGES, stage: stage, stageIndex: stageIndex,

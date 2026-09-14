@@ -1031,3 +1031,152 @@ tr.rowlink { cursor: pointer; }
 .print-only { display: none; }
 .print-head { display: none; }
 @media print { .print-head { display: block; margin-bottom: 8mm; } }
+
+/* =========================================================
+   BÁO GIÁ — bản in dựng theo đúng file Excel của MT House
+   ========================================================= */
+.qsheet {
+  --q-grid:#B7B7B7; --q-head:#8EA2C3; --q-head-stt:#7F6000;
+  --q-lv1:#FFD966; --q-lv1-stt:#BF8F00; --q-lv2:#DDEBF7;
+  --q-pending:#FFF2CC; --q-total:#948A54; --q-gift:#C6E0B4;
+  width: 1120px; margin: 0 auto; background: #fff; color: #1A1A1A;
+  padding: 16px 18px 22px; font-size: 10.5px; line-height: 1.35;
+}
+.qsheet-wrap { background: #EFEDEA; padding: 18px; }
+
+.qsheet .doc-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+.qsheet .doc-head .co { flex: 1; }
+.qsheet .doc-head .co h2 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
+.qsheet .doc-head .co p { margin: 0; font-size: 10px; color: #333; }
+.qsheet .doc-head .logo { width: 130px; text-align: center; flex: none; }
+.qsheet .doc-head .logo img { width: 110px; height: auto; }
+.qsheet .doc-head .rt { width: 230px; text-align: right; flex: none; }
+.qsheet .doc-head .rt h3 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.qsheet .doc-head .rt p { margin: 0; font-size: 10px; font-weight: 700; }
+.qsheet .doc-head .rt p span { font-weight: 400; }
+
+.qsheet table.qinfo { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.qsheet table.qinfo td { border: 1px solid var(--q-grid); padding: 4px 8px; font-size: 10.5px; font-weight: 700; }
+.qsheet table.qinfo td:first-child { width: 250px; }
+
+.qsheet table.qtbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.qsheet table.qtbl th, .qsheet table.qtbl td {
+  border: 1px solid var(--q-grid); padding: 4px 5px; vertical-align: middle;
+}
+.qsheet table.qtbl thead th {
+  background: var(--q-head); color: #1A1A1A; font-size: 10px; font-weight: 700;
+  text-align: center; height: 26px;
+}
+.qsheet table.qtbl thead th.stt { background: var(--q-head-stt); color: #fff; }
+.qsheet .c { text-align: center; }
+.qsheet .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qsheet .b { font-weight: 700; }
+.qsheet .small { font-size: 9.5px; }
+.qsheet .multi { white-space: pre-line; }
+.qsheet .spec { font-size: 9.5px; color: #444; display: block; }
+.qsheet tr.lv1 td { background: var(--q-lv1); font-weight: 700; height: 24px; }
+.qsheet tr.lv1 td.stt { background: var(--q-lv1-stt); color: #fff; text-align: center; }
+.qsheet tr.lv2 td { background: var(--q-lv2); font-weight: 700; height: 22px; }
+.qsheet td.pending { background: var(--q-pending); }
+
+.qsheet .qimgs { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.qsheet .qimgs img { max-width: 100%; max-height: 150px; object-fit: contain; border-radius: 2px; }
+
+.qsheet .legend-title { font-size: 10.5px; font-weight: 700; margin: 14px 0 5px; }
+.qsheet table.qlegend { width: 100%; border-collapse: collapse; }
+.qsheet table.qlegend td {
+  border: 1px solid var(--q-grid); padding: 6px; text-align: center;
+  font-size: 10px; vertical-align: top;
+}
+.qsheet table.qlegend img { max-width: 100%; max-height: 70px; object-fit: contain; display: block; margin: 0 auto 5px; }
+.qsheet table.qlegend .sw {
+  height: 56px; border-radius: 2px; margin-bottom: 5px; background: #DED8D0;
+  display: flex; align-items: center; justify-content: center; color: #8A837B; font-size: 9px;
+}
+
+.qsheet table.qsum { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.qsheet table.qsum td { border: 1px solid var(--q-grid); padding: 6px 8px; font-size: 11px; font-weight: 700; }
+.qsheet table.qsum tr.total td { background: var(--q-total); color: #fff; text-align: center; height: 26px; }
+.qsheet table.qsum tr.total td.money { text-align: right; font-size: 12.5px; }
+.qsheet table.qsum tr.gift td { background: var(--q-gift); }
+
+.qsheet .qnote { margin-top: 12px; font-size: 10px; line-height: 1.6; }
+.qsheet .qnote b { display: block; margin-bottom: 3px; }
+.qsheet .qnote ul { margin: 0; padding-left: 16px; }
+
+/* Khối chữ ký: dùng selector con trực tiếp, nếu không các div lồng bên trong
+   cũng bị ép rộng 46% rồi lệch sang trái. */
+.qsheet .qsign { display: flex; justify-content: space-between; margin-top: 26px; font-size: 10.5px; }
+.qsheet .qsign > div { text-align: center; width: 46%; }
+.qsheet .qsign b { display: block; font-weight: 700; }
+.qsheet .qsign .role { margin-top: 4px; font-weight: 700; }
+.qsheet .qsign .name { margin-top: 52px; font-weight: 700; }
+
+/* =========================================================
+   BÁO GIÁ — bảng soạn thảo
+   ========================================================= */
+.qbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  padding: 10px var(--s4); margin-bottom: var(--s3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-raised); font-size: 13px;
+}
+.qbar.on { border-color: var(--brand-400); background: var(--brand-50); }
+.qbar b { font-weight: 700; }
+.qbar .grow { flex: 1; }
+
+table.qedit td, table.qedit th { padding: 3px 4px; vertical-align: middle; }
+table.qedit tr.picked > td { background: var(--brand-50); }
+table.qedit td.merged { background: #FBF7F2; box-shadow: inset 2px 0 0 var(--brand-300); }
+table.qedit tr.qgroup td { background: var(--surface-sunken); font-weight: 700; }
+table.qedit tr.qadd td { background: var(--surface-alt); padding: 6px 10px; }
+table.qedit tbody tr:hover { background: transparent; }
+table.qedit tr.picked:hover > td { background: var(--brand-50); }
+
+.input-flat {
+  width: 100%; min-height: 32px; padding: 4px 6px; font-size: 13px;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: transparent;
+}
+.input-flat:hover { border-color: var(--line); }
+.input-flat:focus { outline: none; border-color: var(--brand-500); background: #fff; box-shadow: var(--ring); }
+.input-flat[readonly] { color: var(--ink-2); background: var(--surface-sunken); cursor: default; }
+
+.qamount { position: relative; white-space: nowrap; }
+.qamount .input-flat { padding-right: 26px; }
+.qlock {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink-3); cursor: pointer; border-radius: 4px;
+}
+.qlock:hover { background: var(--surface-sunken); color: var(--brand-700); }
+.qlock svg { width: 14px; height: 14px; }
+
+.qimg-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%;
+  min-height: 44px; padding: 5px 4px; cursor: pointer; font-size: 11px; font-weight: 600;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink-2);
+}
+.qimg-btn:hover { border-color: var(--brand-400); background: var(--brand-50); color: var(--brand-700); }
+.qimg-btn.aim { border-style: solid; border-color: var(--brand-500); background: var(--brand-50); color: var(--brand-700); }
+.qimg-btn svg { width: 16px; height: 16px; }
+
+.qlist { display: grid; gap: 6px; }
+.qlist-row { display: flex; gap: 6px; align-items: center; }
+.qlist-row .input { flex: 1; }
+
+/* =========================================================
+   In riêng bản báo giá
+   ========================================================= */
+@media print {
+  body.printing-quote .app-root { display: none !important; }
+  body.printing-quote #overlay-root .backdrop { display: none !important; }
+  body.printing-quote #overlay-root .fullscreen { position: static; display: block; background: #fff; }
+  body.printing-quote .fs-bar { display: none !important; }
+  body.printing-quote .fs-body { overflow: visible; }
+  body.printing-quote .qsheet-wrap { padding: 0; background: #fff; }
+  body.printing-quote .qsheet { width: auto; padding: 0; }
+  body.printing-quote .qsheet table.qtbl thead { display: table-header-group; }
+  body.printing-quote .qsheet table.qtbl tr { break-inside: avoid; }
+  body.printing-quote .qsheet tr.lv1, body.printing-quote .qsheet tr.lv2 { break-after: avoid; }
+}

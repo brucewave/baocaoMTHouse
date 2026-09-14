@@ -26,6 +26,7 @@
     { id: 'send',      label: 'Gửi báo cáo',   short: 'Gửi',      icon: 'send',     roles: ['staff', 'admin'] },
     { id: 'list',      label: 'Báo cáo',       short: 'Báo cáo',  icon: 'inbox',    roles: ['staff', 'admin'] },
     { id: 'projects',  label: 'Khách hàng',    short: 'Khách',    icon: 'building', roles: ['staff', 'admin'] },
+    { id: 'quotes',    label: 'Báo giá',       short: 'Báo giá',  icon: 'money',    roles: ['admin'] },
     { id: 'timesheet', label: 'Bảng chấm công',short: 'Chấm công',icon: 'table',    roles: ['staff', 'admin'] },
     { id: 'summary',   label: 'Tổng hợp',      short: 'Tổng hợp', icon: 'chart',    roles: ['staff', 'admin'] },
     { id: 'settings',  label: 'Cài đặt',       short: 'Cài đặt',  icon: 'settings', roles: ['admin'] }
@@ -264,14 +265,16 @@
       Quản lý vẫn vào được màn hình gửi báo cáo qua nút “Báo cáo mới”. */
   function navFor() {
     var order = isAdmin()
-      ? ['summary', 'list', 'projects', 'timesheet', 'settings']
+      ? ['summary', 'list', 'projects', 'quotes', 'timesheet']
       : ['send', 'list', 'projects', 'timesheet', 'summary'];
     return order.map(function (id) {
       return NAV.filter(function (n) { return n.id === id; })[0];
     }).filter(function (it) { return it && it.roles.indexOf(S.user.role) >= 0; });
   }
   function allowedViews() {
-    return navFor().map(function (n) { return n.id; }).concat(['send']);
+    var ids = navFor().map(function (n) { return n.id; }).concat(['send']);
+    if (isAdmin()) ids.push('settings', 'quotes', 'quote');
+    return ids;
   }
   function homeView() { return navFor()[0].id; }
 
@@ -305,6 +308,10 @@
             '<span class="avatar" aria-hidden="true">' + U.esc(U.initials(S.user.name)) + '</span>' +
             '<b>' + U.esc(S.user.name) + '</b>' +
           '</button>' +
+          (isAdmin()
+            ? '<a class="icon-btn" href="#/settings" aria-label="Cài đặt hệ thống" title="Cài đặt">' +
+              U.icon('settings') + '</a>'
+            : '') +
           '<button class="icon-btn" id="btn-logout" type="button" aria-label="Đăng xuất">' + U.icon('logout') + '</button>' +
         '</header>' +
 
@@ -2657,13 +2664,14 @@
      ========================================================= */
   function reload() {
     return Promise.all([Store.settings(), Store.all('employees'), Store.all('projects'),
-      Store.all('categories'), Store.all('reports')])
+      Store.all('categories'), Store.all('reports'), Store.all('quotes')])
       .then(function (r) {
         S.settings = r[0];
         S.employees = r[1];
         S.projects = r[2].sort(function (a, b) { return a.code < b.code ? -1 : 1; });
         S.categories = r[3].sort(function (a, b) { return (a.order || 9) - (b.order || 9); });
         S.reports = r[4];
+        S.quotes = r[5] || [];
         if (S.user) S.user = emp(S.user.id);
       });
   }
@@ -2692,6 +2700,8 @@
     if (r.view === 'send') viewSend(main, r.q);
     else if (r.view === 'list') viewList(main, r.q);
     else if (r.view === 'projects') viewProjects(main, r.q);
+    else if (r.view === 'quotes') Quote.viewList(main, r.q);
+    else if (r.view === 'quote') Quote.viewEdit(main, r.q);
     else if (r.view === 'timesheet') viewTimesheet(main, r.q);
     else if (r.view === 'summary') viewSummary(main, r.q);
     else if (r.view === 'settings') viewSettings(main, r.q);
@@ -2709,6 +2719,13 @@
     document.title = 'MT HOUSE — ' +
       (NAV.filter(function (n) { return n.id === r.view; })[0] || { label: 'Báo cáo' }).label;
   }
+
+  /* Cầu nối cho quote.js dùng lại trạng thái và các hàm chung của ứng dụng */
+  Quote.init({
+    state: S, assets: ASSETS,
+    proj: proj, emp: emp, cat: cat, isAdmin: isAdmin, staffList: staffList,
+    reload: reload, render: render, setQ: setQ, go: go, urlOf: urlOf
+  });
 
   window.addEventListener('hashchange', render);
 
