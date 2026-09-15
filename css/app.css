@@ -475,24 +475,57 @@ input[type="password"]::-ms-clear { display: none; width: 0; height: 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.wline {
-  display: grid; gap: var(--s3) var(--s4);
-  grid-template-columns: minmax(190px, 1.2fr) minmax(210px, auto) minmax(300px, auto);
-  align-items: start;
+/* Xếp theo flex để các ô tự xuống hàng gọn gàng thay vì để lại khoảng trống */
+.wline, .wline2 { display: flex; flex-wrap: wrap; gap: var(--s3) var(--s4); align-items: flex-start; }
+.wline2 { margin-top: var(--s3); }
+.wline .field, .wline2 .field { margin-bottom: 0; min-width: 0; }
+
+.w-proj   { flex: 1 1 210px; }
+.w-cat    { flex: 0 1 auto; }
+.w-time   { flex: 0 0 auto; }
+.w-hours  { flex: 0 0 auto; }
+.w-desc   { flex: 2 1 320px; }
+.w-reason { flex: 1 1 210px; }
+
+.wline .segmented { flex-wrap: nowrap; }
+.wline .segmented label { padding: 0 11px; min-height: 40px; font-size: 13px; white-space: nowrap; }
+
+.w-time-in { display: flex; align-items: center; gap: 6px; }
+.w-time-in .input { width: 116px; min-height: 40px; padding: 8px 6px; }
+.w-dash { color: var(--ink-3); }
+
+/* Giờ công: mặc định chỉ là con số đã tự tính, gọn hơn hai ô nhập */
+.w-hours-v {
+  display: flex; align-items: center; gap: var(--s3);
+  min-height: 40px; padding: 0 6px 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-sunken); font-size: 13.5px; color: var(--ink-2);
+  white-space: nowrap;
 }
-.wline2 {
-  display: grid; gap: var(--s3) var(--s4);
-  grid-template-columns: minmax(260px, 2fr) minmax(190px, 1fr);
-  margin-top: var(--s3); align-items: start;
+.w-hours-v b { font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.w-hours-v .ot b { color: var(--brand-700); }
+
+.w-hours-in { display: flex; align-items: center; gap: 5px; }
+.w-hours-in .input { width: 74px; min-height: 40px; padding: 8px 6px; text-align: right; }
+.w-unit { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+
+.w-hbtn {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink-3); cursor: pointer; border-radius: var(--r-sm);
 }
-.wline .field, .wline2 .field { margin-bottom: 0; }
-.wline .segmented label { padding: 0 var(--s3); min-height: 38px; font-size: 13px; }
+.w-hbtn:hover { background: var(--surface); color: var(--brand-700); }
+.w-hbtn svg { width: 15px; height: 15px; }
 
 .sd-sum { font-size: 14px; color: var(--ink-2); margin: 6px 0 0; }
 .sd-sum b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
-@media (max-width: 1000px) {
-  .wline, .wline2 { grid-template-columns: 1fr; }
+/* Trên điện thoại cho mỗi ô một hàng riêng, ô giờ giãn hết chiều ngang */
+@media (max-width: 620px) {
+  .w-proj, .w-cat, .w-time, .w-hours, .w-desc, .w-reason { flex: 1 1 100%; }
+  .wline .segmented { flex-wrap: wrap; }
+  .w-time-in { width: 100%; }
+  .w-time-in .input { width: auto; flex: 1; }
+  .w-hours-v, .w-hours-in { justify-content: space-between; }
 }
 
 /* --- Form nhập theo bước: công trình → hạng mục → công việc → ảnh --- */

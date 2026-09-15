@@ -538,13 +538,18 @@
       description: '', reason: '',
       timeFrom: S.settings.hcFrom, timeTo: S.settings.hcTo,
       hc: '', tc: '',
+      manualHours: false,   /* true khi người dùng tự gõ số giờ, lúc đó thôi tự tính */
       imgs: [],     /* ảnh mới chọn, chưa lưu */
       keep: []      /* ảnh cũ giữ lại khi đang sửa báo cáo */
     };
   }
 
-  /** Gợi ý giờ HC / TC từ khung giờ, người dùng vẫn sửa lại được */
+  /**
+   * Tính giờ HC / TC từ khung giờ: phần nằm trong ca hành chính (trừ nghỉ trưa)
+   * là giờ HC, phần còn lại là tăng ca. Dòng nào người dùng tự gõ số thì giữ nguyên.
+   */
   function autoHours(row, date) {
+    if (row.manualHours) return;
     var res = U.splitHours(row.timeFrom, row.timeTo, {
       hcFrom: S.settings.hcFrom, hcTo: S.settings.hcTo,
       lunchFrom: S.settings.lunchFrom, lunchTo: S.settings.lunchTo,
@@ -639,7 +644,10 @@
         '<div><h2>' + (editing ? 'Sửa báo cáo' : 'Gửi báo cáo công việc') + '</h2>' +
         '<p>' + (editing
           ? 'Cập nhật nội dung rồi gửi lại cho quản lý duyệt.'
-          : 'Mỗi dòng là một đầu việc kèm khung giờ riêng. Làm bao nhiêu việc trong ngày thì thêm bấy nhiêu dòng.') +
+          : 'Mỗi dòng là một đầu việc kèm khung giờ riêng. Chọn giờ là hệ thống tự tính — phần ngoài ca ' +
+            U.hhmmVN(S.settings.hcFrom) + '–' + U.hhmmVN(S.settings.hcTo) +
+            ' (nghỉ trưa ' + U.hhmmVN(S.settings.lunchFrom) + '–' + U.hhmmVN(S.settings.lunchTo) +
+            ') tính là tăng ca.') +
         '</p></div>' +
       '</div>' +
 
@@ -702,7 +710,7 @@
       '</div>' +
 
       '<div class="wline">' +
-        '<div class="field"><label for="f-proj-' + r.id + '">Mã công trình <span class="req">*</span></label>' +
+        '<div class="field w-proj"><label for="f-proj-' + r.id + '">Mã công trình <span class="req">*</span></label>' +
           '<select class="select" id="f-proj-' + r.id + '" data-f="projectId" data-r="' + r.id + '">' +
             '<option value="">— Chọn công trình —</option>' +
             S.projects.filter(function (x) { return x.active !== false || x.id === r.projectId; })
@@ -712,7 +720,7 @@
               }).join('') +
           '</select></div>' +
 
-        '<div class="field"><span class="field-label">Hạng mục</span>' +
+        '<div class="field w-cat"><span class="field-label">Hạng mục</span>' +
           '<div class="segmented">' +
             S.categories.map(function (c) {
               var id = 'cat-' + r.id + '-' + c.id;
@@ -723,28 +731,24 @@
             }).join('') +
           '</div></div>' +
 
-        '<div class="inline-row">' +
-          '<div class="field"><label for="f-from-' + r.id + '">Bắt đầu</label>' +
-            '<input class="input" type="time" id="f-from-' + r.id + '" data-f="timeFrom" data-r="' + r.id + '" ' +
-              'value="' + U.esc(r.timeFrom) + '"></div>' +
-          '<div class="field"><label for="f-to-' + r.id + '">Kết thúc</label>' +
-            '<input class="input" type="time" id="f-to-' + r.id + '" data-f="timeTo" data-r="' + r.id + '" ' +
-              'value="' + U.esc(r.timeTo) + '"></div>' +
-          '<div class="field"><label for="f-hc-' + r.id + '">Giờ HC</label>' +
-            '<input class="input num" type="number" min="0" max="24" step="0.25" id="f-hc-' + r.id + '" ' +
-              'data-f="hc" data-r="' + r.id + '" value="' + (r.hc === '' ? '' : r.hc) + '"></div>' +
-          '<div class="field"><label for="f-tc-' + r.id + '">Giờ TC</label>' +
-            '<input class="input num" type="number" min="0" max="24" step="0.25" id="f-tc-' + r.id + '" ' +
-              'data-f="tc" data-r="' + r.id + '" value="' + (r.tc === '' ? '' : r.tc) + '"></div>' +
-        '</div>' +
+        '<div class="field w-time"><span class="field-label">Khung giờ</span>' +
+          '<div class="w-time-in">' +
+            '<input class="input" type="time" aria-label="Giờ bắt đầu" data-f="timeFrom" data-r="' + r.id + '" ' +
+              'value="' + U.esc(r.timeFrom) + '">' +
+            '<span class="w-dash">–</span>' +
+            '<input class="input" type="time" aria-label="Giờ kết thúc" data-f="timeTo" data-r="' + r.id + '" ' +
+              'value="' + U.esc(r.timeTo) + '">' +
+          '</div></div>' +
+
+        '<div class="field w-hours"><span class="field-label">Giờ công</span>' + hoursCellHtml(r) + '</div>' +
       '</div>' +
 
       '<div class="wline2">' +
-        '<div class="field"><label for="f-desc-' + r.id + '">Nội dung công việc <span class="req">*</span></label>' +
+        '<div class="field w-desc"><label for="f-desc-' + r.id + '">Nội dung công việc <span class="req">*</span></label>' +
           '<textarea class="textarea" rows="2" id="f-desc-' + r.id + '" data-f="description" data-r="' + r.id + '" ' +
             'placeholder="Ví dụ: Triển khai bản vẽ nội thất chi tiết thi công tầng 2.">' +
             U.esc(r.description) + '</textarea></div>' +
-        '<div class="field"><label for="f-reason-' + r.id + '">Lý do / mục tiêu</label>' +
+        '<div class="field w-reason"><label for="f-reason-' + r.id + '">Lý do / mục tiêu</label>' +
           '<input class="input" id="f-reason-' + r.id + '" data-f="reason" data-r="' + r.id + '" ' +
             'value="' + U.esc(r.reason) + '" placeholder="Không bắt buộc"></div>' +
       '</div>' +
@@ -759,6 +763,28 @@
             }).join('') +
           '</div>'
         : '') +
+    '</div>';
+  }
+
+  /** Giờ công: bình thường chỉ hiện số tự tính, bấm bút chì mới mở ra gõ tay */
+  function hoursCellHtml(r) {
+    if (r.manualHours) {
+      return '<div class="w-hours-in">' +
+        '<input class="input num" type="number" min="0" max="24" step="0.25" aria-label="Giờ hành chính" ' +
+          'data-f="hc" data-r="' + r.id + '" value="' + (r.hc === '' ? '' : r.hc) + '">' +
+        '<span class="w-unit">HC</span>' +
+        '<input class="input num" type="number" min="0" max="24" step="0.25" aria-label="Giờ tăng ca" ' +
+          'data-f="tc" data-r="' + r.id + '" value="' + (r.tc === '' ? '' : r.tc) + '">' +
+        '<span class="w-unit">TC</span>' +
+        '<button class="w-hbtn" type="button" data-autoh="' + r.id + '" ' +
+          'title="Quay lại tự tính theo khung giờ">' + U.icon('refresh') + '</button>' +
+      '</div>';
+    }
+    return '<div class="w-hours-v">' +
+      '<span><b>' + U.hours(r.hc) + '</b> HC</span>' +
+      '<span class="' + (Number(r.tc) > 0 ? 'ot' : 't-muted') + '"><b>' + U.hours(r.tc) + '</b> TC</span>' +
+      '<button class="w-hbtn" type="button" data-edith="' + r.id + '" title="Sửa tay số giờ">' +
+        U.icon('edit') + '</button>' +
     '</div>';
   }
 
@@ -779,7 +805,12 @@
       var r = rowById(t.getAttribute('data-r'));
       if (!r) return;
       var f = t.getAttribute('data-f');
-      r[f] = (f === 'hc' || f === 'tc') ? (t.value === '' ? '' : Number(t.value)) : t.value;
+      if (f === 'hc' || f === 'tc') {
+        r[f] = t.value === '' ? '' : Number(t.value);
+        r.manualHours = true;
+      } else {
+        r[f] = t.value;
+      }
       if (f === 'description') return;
       refreshSendSummary(ctx);
     });
@@ -824,6 +855,19 @@
       var id = b.getAttribute('data-delrow');
       sendDraft.rows = sendDraft.rows.filter(function (r) { return r.id !== id; });
       if (pasteRow === id) pasteRow = null;
+      redraw();
+    });
+
+    U.on(main, 'click', '[data-edith]', function (e, b) {
+      var r = rowById(b.getAttribute('data-edith'));
+      if (r) { r.manualHours = true; redraw(); }
+    });
+
+    U.on(main, 'click', '[data-autoh]', function (e, b) {
+      var r = rowById(b.getAttribute('data-autoh'));
+      if (!r) return;
+      r.manualHours = false;
+      autoHours(r, sendDraft.date);
       redraw();
     });
 
