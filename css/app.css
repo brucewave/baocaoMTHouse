@@ -448,6 +448,53 @@ input[type="password"]::-ms-clear { display: none; width: 0; height: 0; }
 .segmented input:focus-visible + label { outline: 2px solid var(--brand-600); outline-offset: 2px; }
 .seg-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 
+/* --- Nhập báo cáo theo dòng: mỗi dòng là một đầu việc --- */
+.wlist { display: grid; gap: var(--s3); }
+
+.wrow {
+  background: var(--surface-raised); border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-1);
+  padding: var(--s3) var(--s4) var(--s4);
+}
+.wrow.aim { border-left-color: var(--brand-500); }
+
+.wrow-head {
+  display: flex; align-items: center; gap: var(--s2);
+  padding-bottom: var(--s3); margin-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.wrow-head .grow { flex: 1; }
+.wrow-n {
+  width: 24px; height: 24px; flex: none; border-radius: 50%;
+  background: var(--brand-600); color: #fff;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+.wrow-title {
+  font-size: 14px; font-weight: 700; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.wline {
+  display: grid; gap: var(--s3) var(--s4);
+  grid-template-columns: minmax(190px, 1.2fr) minmax(210px, auto) minmax(300px, auto);
+  align-items: start;
+}
+.wline2 {
+  display: grid; gap: var(--s3) var(--s4);
+  grid-template-columns: minmax(260px, 2fr) minmax(190px, 1fr);
+  margin-top: var(--s3); align-items: start;
+}
+.wline .field, .wline2 .field { margin-bottom: 0; }
+.wline .segmented label { padding: 0 var(--s3); min-height: 38px; font-size: 13px; }
+
+.sd-sum { font-size: 14px; color: var(--ink-2); margin: 6px 0 0; }
+.sd-sum b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1000px) {
+  .wline, .wline2 { grid-template-columns: 1fr; }
+}
+
 /* --- Form nhập theo bước: công trình → hạng mục → công việc → ảnh --- */
 .form-2col {
   display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);

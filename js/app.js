@@ -524,269 +524,461 @@
 
   /* =========================================================
      MÀN HÌNH 1 — GỬI BÁO CÁO
+     Một lần gửi nhiều đầu việc: mỗi dòng là một công việc kèm
+     khung giờ riêng, đúng cách ghi trong file Excel. Gửi xong
+     mỗi dòng thành một báo cáo riêng để quản lý duyệt từng cái.
      ========================================================= */
+  var sendDraft = null, sendDraftKey = '', pasteRow = null;
+
+  function blankWorkRow() {
+    return {
+      id: U.uid('wr'),
+      projectId: '',
+      categoryId: S.categories[0] ? S.categories[0].id : '',
+      description: '', reason: '',
+      timeFrom: S.settings.hcFrom, timeTo: S.settings.hcTo,
+      hc: '', tc: '',
+      imgs: [],     /* ảnh mới chọn, chưa lưu */
+      keep: []      /* ảnh cũ giữ lại khi đang sửa báo cáo */
+    };
+  }
+
+  /** Gợi ý giờ HC / TC từ khung giờ, người dùng vẫn sửa lại được */
+  function autoHours(row, date) {
+    var res = U.splitHours(row.timeFrom, row.timeTo, {
+      hcFrom: S.settings.hcFrom, hcTo: S.settings.hcTo,
+      lunchFrom: S.settings.lunchFrom, lunchTo: S.settings.lunchTo,
+      weekend: U.isWeekend(date)
+    });
+    if (!res) return;
+    row.hc = res.hc;
+    row.tc = res.tc;
+  }
+
   function viewSend(main, q) {
     var editing = q.edit ? S.reports.filter(function (r) { return r.id === q.edit; })[0] : null;
-    var pendingImgs = [];  /* ảnh mới chọn, chưa lưu */
-    var keptImgs = [];     /* ảnh cũ khi sửa */
+    var key = (q.edit || 'new') + '|' + (S.user ? S.user.id : '');
 
-    var r = editing || {
-      date: U.todayISO(), projectId: '', categoryId: S.categories[0] ? S.categories[0].id : '',
-      timeFrom: S.settings.hcFrom, timeTo: S.settings.hcTo, hc: '', tc: '', description: '', reason: ''
-    };
-    var targetEmp = editing ? editing.employeeId : (isAdmin() ? (q.emp || (staffList()[0] || {}).id || '') : S.user.id);
+    var ctx = { main: main, editing: editing };
+    ctx.redraw = function () { paintSend(ctx); };
 
-    function step(n, title) {
-      return '<div class="step"><span class="step-n" aria-hidden="true">' + n + '</span>' +
-        '<span class="step-t">' + title + '</span></div>';
+    if (!sendDraft || sendDraftKey !== key) {
+      sendDraftKey = key;
+      pasteRow = null;
+      if (editing) {
+        var row = blankWorkRow();
+        row.projectId = editing.projectId;
+        row.categoryId = editing.categoryId;
+        row.description = editing.description;
+        row.reason = editing.reason || '';
+        row.timeFrom = editing.timeFrom;
+        row.timeTo = editing.timeTo;
+        row.hc = editing.hc;
+        row.tc = editing.tc;
+        sendDraft = { date: editing.date, employeeId: editing.employeeId, rows: [row] };
+        Store.imagesOf(editing.id).then(function (list) {
+          row.keep = list;
+          ctx.redraw();
+        });
+      } else {
+        var first = blankWorkRow();
+        autoHours(first, U.todayISO());
+        sendDraft = {
+          date: U.todayISO(),
+          employeeId: isAdmin() ? ((staffList()[0] || {}).id || '') : S.user.id,
+          rows: [first]
+        };
+      }
     }
+    ctx.draft = sendDraft;
+
+    bindSend(ctx);
+    paintSend(ctx);
+
+    /* Dán ảnh chụp màn hình bằng Ctrl+V vào dòng đang ngắm */
+    main._onPaste = function (e) {
+      var ov = document.getElementById('overlay-root');
+      if (ov && ov.children.length) return;          /* hộp thoại tự lo */
+      if (!e.clipboardData || !e.clipboardData.files || !e.clipboardData.files.length) return;
+      var rows = sendDraft.rows;
+      var target = pasteRow
+        ? rows.filter(function (r) { return r.id === pasteRow; })[0]
+        : (rows.length === 1 ? rows[0] : null);
+      if (!target) {
+        U.toast('Hãy bấm nút Ảnh ở dòng cần dán trước, rồi Ctrl+V', 'err');
+        return;
+      }
+      addRowImages(target, e.clipboardData.files).then(ctx.redraw);
+    };
+    document.addEventListener('paste', main._onPaste);
+  }
+
+  /** Nén rồi giữ ảnh trong bộ nhớ, chỉ ghi vào CSDL khi bấm Gửi */
+  function addRowImages(row, files) {
+    var imgs = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); });
+    if (!imgs.length) return Promise.resolve();
+    return Promise.all(imgs.map(function (f) {
+      return U.compressImage(f).then(function (o) {
+        return { blob: o.blob, w: o.w, h: o.h, name: f.name || 'anh.jpg', url: urlOf(o.blob) };
+      }).catch(function () { return null; });
+    })).then(function (list) {
+      list.filter(Boolean).forEach(function (i) { row.imgs.push(i); });
+      U.toast('Đã thêm ' + list.filter(Boolean).length + ' ảnh', 'ok');
+    });
+  }
+
+  function rowImageCount(row) { return row.imgs.length + row.keep.length; }
+
+  function paintSend(ctx) {
+    var main = ctx.main, d = sendDraft, editing = ctx.editing;
+    var totalHC = d.rows.reduce(function (s, r) { return s + (Number(r.hc) || 0); }, 0);
+    var totalTC = d.rows.reduce(function (s, r) { return s + (Number(r.tc) || 0); }, 0);
 
     main.innerHTML =
       '<div class="page-head">' +
-        '<div><h2>' + (editing ? 'Sửa báo cáo' : 'Gửi báo cáo công việc') + '</h2></div>' +
+        '<div><h2>' + (editing ? 'Sửa báo cáo' : 'Gửi báo cáo công việc') + '</h2>' +
+        '<p>' + (editing
+          ? 'Cập nhật nội dung rồi gửi lại cho quản lý duyệt.'
+          : 'Mỗi dòng là một đầu việc kèm khung giờ riêng. Làm bao nhiêu việc trong ngày thì thêm bấy nhiêu dòng.') +
+        '</p></div>' +
       '</div>' +
 
-      '<form id="rp-form" novalidate><div class="form-2col">' +
-
-      /* ---------- Cột trái: công trình → hạng mục → công việc ---------- */
-      '<div class="card"><div class="card-body">' +
-
+      /* ---- thông tin chung của cả buổi báo cáo ---- */
+      '<div class="card"><div class="card-body"><div class="field-row">' +
+        '<div class="field"><label for="sd-date">Ngày làm việc <span class="req">*</span></label>' +
+          '<input class="input" type="date" id="sd-date" data-head="date" value="' + U.esc(d.date) + '"></div>' +
         (isAdmin() && !editing
-          ? '<div class="field"><label for="f-emp-of">Gửi thay cho nhân viên</label>' +
-            '<select class="select" id="f-emp-of">' +
+          ? '<div class="field"><label for="sd-emp">Gửi thay cho nhân viên</label>' +
+            '<select class="select" id="sd-emp" data-head="employeeId">' +
               staffList().map(function (e) {
-                return '<option value="' + e.id + '"' + (targetEmp === e.id ? ' selected' : '') + '>' + U.esc(e.name) + '</option>';
+                return '<option value="' + e.id + '"' + (d.employeeId === e.id ? ' selected' : '') + '>' +
+                  U.esc(e.name) + '</option>';
               }).join('') +
             '</select></div>'
           : '') +
+        '<div class="field"><span class="field-label">Tổng trong ngày</span>' +
+          '<p class="sd-sum">' + d.rows.length + ' đầu việc · <b>' + U.hours(totalHC) + '</b> giờ HC · <b>' +
+            U.hours(totalTC) + '</b> giờ TC</p></div>' +
+      '</div></div></div>' +
 
-        '<div class="step-block">' + step(1, 'Mã công trình') +
-          '<div class="field">' +
-            '<label class="visually-hidden" for="f-proj">Mã công trình</label>' +
-            '<select class="select" id="f-proj" required><option value="">— Chọn công trình —</option>' +
-              S.projects.filter(function (p) { return p.active !== false || p.id === r.projectId; })
-                .map(function (p) {
-                  return '<option value="' + p.id + '"' + (r.projectId === p.id ? ' selected' : '') + '>' +
-                    U.esc(p.code + ' · ' + p.name) + '</option>';
-                }).join('') +
-            '</select></div>' +
+      /* ---- từng đầu việc ---- */
+      '<div class="wlist" id="wlist">' +
+        d.rows.map(function (r, i) { return workRowHtml(r, i, d.rows.length); }).join('') +
+      '</div>' +
+
+      (editing ? '' :
+        '<div class="btn-row" style="margin-top:14px">' +
+          '<button class="btn" type="button" data-addrow>' + U.icon('plus') + ' Thêm dòng công việc</button>' +
+        '</div>') +
+
+      /* ---- gửi ---- */
+      '<div class="card" style="margin-top:20px"><div class="card-body">' +
+        '<span class="err" id="sd-err" hidden></span>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-primary btn-lg" type="button" data-submit>' + U.icon('send') + ' ' +
+            (editing ? 'Cập nhật &amp; gửi duyệt lại'
+                     : 'Gửi ' + d.rows.length + ' báo cáo') + '</button>' +
+          (editing ? '<a class="btn btn-lg" href="#/list">Huỷ</a>' : '') +
         '</div>' +
+        '<p class="help" style="margin-top:10px">Mỗi dòng sẽ thành một báo cáo riêng, ở trạng thái ' +
+          '<b>Chờ duyệt</b> cho tới khi quản lý xác nhận.</p>' +
+      '</div></div>';
+  }
 
-        '<div class="step-block">' + step(2, 'Hạng mục') +
+  function workRowHtml(r, i, total) {
+    var p = r.projectId ? proj(r.projectId) : null;
+    var nImg = rowImageCount(r);
+    return '<div class="wrow' + (pasteRow === r.id ? ' aim' : '') + '" data-row="' + r.id + '">' +
+      '<div class="wrow-head">' +
+        '<span class="wrow-n">' + (i + 1) + '</span>' +
+        '<span class="wrow-title">' + U.esc(p ? p.name : 'Đầu việc ' + (i + 1)) + '</span>' +
+        '<div class="grow"></div>' +
+        '<button class="btn btn-sm" type="button" data-img="' + r.id + '">' +
+          U.icon('image') + ' ' + (nImg ? nImg + ' ảnh' : 'Ảnh') + '</button>' +
+        (total > 1
+          ? '<button class="btn btn-sm btn-danger" type="button" data-delrow="' + r.id + '" ' +
+            'aria-label="Xoá đầu việc này">' + U.icon('trash') + '</button>'
+          : '') +
+      '</div>' +
+
+      '<div class="wline">' +
+        '<div class="field"><label for="f-proj-' + r.id + '">Mã công trình <span class="req">*</span></label>' +
+          '<select class="select" id="f-proj-' + r.id + '" data-f="projectId" data-r="' + r.id + '">' +
+            '<option value="">— Chọn công trình —</option>' +
+            S.projects.filter(function (x) { return x.active !== false || x.id === r.projectId; })
+              .map(function (x) {
+                return '<option value="' + x.id + '"' + (r.projectId === x.id ? ' selected' : '') + '>' +
+                  U.esc(x.code + ' · ' + x.name) + '</option>';
+              }).join('') +
+          '</select></div>' +
+
+        '<div class="field"><span class="field-label">Hạng mục</span>' +
           '<div class="segmented">' +
             S.categories.map(function (c) {
-              return '<input type="radio" name="cat" id="cat-' + c.id + '" value="' + c.id + '"' +
-                ((r.categoryId || S.categories[0].id) === c.id ? ' checked' : '') + '>' +
-                '<label for="cat-' + c.id + '"><span class="seg-dot" style="background:' + c.hex + '"></span>' +
+              var id = 'cat-' + r.id + '-' + c.id;
+              return '<input type="radio" name="cat-' + r.id + '" id="' + id + '" value="' + c.id + '"' +
+                (r.categoryId === c.id ? ' checked' : '') + ' data-f="categoryId" data-r="' + r.id + '">' +
+                '<label for="' + id + '"><span class="seg-dot" style="background:' + c.hex + '"></span>' +
                 U.esc(c.name) + '</label>';
             }).join('') +
-          '</div>' +
+          '</div></div>' +
+
+        '<div class="inline-row">' +
+          '<div class="field"><label for="f-from-' + r.id + '">Bắt đầu</label>' +
+            '<input class="input" type="time" id="f-from-' + r.id + '" data-f="timeFrom" data-r="' + r.id + '" ' +
+              'value="' + U.esc(r.timeFrom) + '"></div>' +
+          '<div class="field"><label for="f-to-' + r.id + '">Kết thúc</label>' +
+            '<input class="input" type="time" id="f-to-' + r.id + '" data-f="timeTo" data-r="' + r.id + '" ' +
+              'value="' + U.esc(r.timeTo) + '"></div>' +
+          '<div class="field"><label for="f-hc-' + r.id + '">Giờ HC</label>' +
+            '<input class="input num" type="number" min="0" max="24" step="0.25" id="f-hc-' + r.id + '" ' +
+              'data-f="hc" data-r="' + r.id + '" value="' + (r.hc === '' ? '' : r.hc) + '"></div>' +
+          '<div class="field"><label for="f-tc-' + r.id + '">Giờ TC</label>' +
+            '<input class="input num" type="number" min="0" max="24" step="0.25" id="f-tc-' + r.id + '" ' +
+              'data-f="tc" data-r="' + r.id + '" value="' + (r.tc === '' ? '' : r.tc) + '"></div>' +
         '</div>' +
+      '</div>' +
 
-        '<div class="step-block">' + step(3, 'Công việc đã làm') +
-          '<div class="field">' +
-            '<label class="visually-hidden" for="f-desc">Diễn giải nội dung công việc</label>' +
-            '<textarea class="textarea" id="f-desc" rows="3" required ' +
-              'placeholder="Ví dụ: Triển khai bản vẽ nội thất chi tiết thi công tầng 2.">' + U.esc(r.description) + '</textarea>' +
-          '</div>' +
+      '<div class="wline2">' +
+        '<div class="field"><label for="f-desc-' + r.id + '">Nội dung công việc <span class="req">*</span></label>' +
+          '<textarea class="textarea" rows="2" id="f-desc-' + r.id + '" data-f="description" data-r="' + r.id + '" ' +
+            'placeholder="Ví dụ: Triển khai bản vẽ nội thất chi tiết thi công tầng 2.">' +
+            U.esc(r.description) + '</textarea></div>' +
+        '<div class="field"><label for="f-reason-' + r.id + '">Lý do / mục tiêu</label>' +
+          '<input class="input" id="f-reason-' + r.id + '" data-f="reason" data-r="' + r.id + '" ' +
+            'value="' + U.esc(r.reason) + '" placeholder="Không bắt buộc"></div>' +
+      '</div>' +
 
-          '<div class="inline-row" style="margin-top:10px">' +
-            '<div class="field"><label for="f-date">Ngày</label>' +
-              '<input class="input" type="date" id="f-date" value="' + U.esc(r.date) + '" required></div>' +
-            '<div class="field"><label for="f-from">Bắt đầu</label>' +
-              '<input class="input" type="time" id="f-from" value="' + U.esc(r.timeFrom) + '" required></div>' +
-            '<div class="field"><label for="f-to">Kết thúc</label>' +
-              '<input class="input" type="time" id="f-to" value="' + U.esc(r.timeTo) + '" required></div>' +
-            '<div class="field"><label for="f-hc">Giờ HC</label>' +
-              '<input class="input num" type="number" id="f-hc" min="0" max="24" step="0.25" value="' + (r.hc === '' ? '' : r.hc) + '" required></div>' +
-            '<div class="field"><label for="f-tc">Giờ TC</label>' +
-              '<input class="input num" type="number" id="f-tc" min="0" max="24" step="0.25" value="' + (r.tc === '' ? '' : r.tc) + '"></div>' +
-          '</div>' +
-          '<span class="help" id="calc-hint">Giờ HC / TC tự tính theo khung giờ, sửa lại được.</span>' +
+      (nImg
+        ? '<div class="shots" style="margin-top:12px">' +
+            r.keep.map(function (im) {
+              return '<div class="shot" style="cursor:default"><img src="' + urlOf(im.blob) + '" alt=""></div>';
+            }).join('') +
+            r.imgs.map(function (im) {
+              return '<div class="shot" style="cursor:default"><img src="' + im.url + '" alt=""></div>';
+            }).join('') +
+          '</div>'
+        : '') +
+    '</div>';
+  }
 
-          '<div><button class="link-more" type="button" id="btn-reason">' +
-            (r.reason ? 'Ẩn lý do / mục tiêu' : '+ Thêm lý do / mục tiêu (không bắt buộc)') + '</button></div>' +
-          '<div class="field" id="reason-wrap"' + (r.reason ? '' : ' hidden') + '>' +
-            '<label class="visually-hidden" for="f-reason">Lý do / Mục tiêu thực hiện</label>' +
-            '<input class="input" id="f-reason" value="' + U.esc(r.reason || '') + '" ' +
-              'placeholder="Ví dụ: Chuẩn bị hồ sơ báo giá thi công chính xác."></div>' +
+  function bindSend(ctx) {
+    var main = ctx.main, redraw = ctx.redraw, editing = ctx.editing;
+    if (main._sendBound) return;
+    main._sendBound = true;
 
-          '<span class="err" id="f-err" hidden></span>' +
-        '</div>' +
-      '</div></div>' +
-
-      /* ---------- Cột phải: ảnh + nút gửi ---------- */
-      '<div class="card"><div class="card-body">' +
-        step(4, 'Hình ảnh công việc') +
-        '<div class="dropzone" id="dz">' + U.icon('upload') +
-          '<p>Kéo thả ảnh, hoặc dán <span class="kbd">Ctrl</span>+<span class="kbd">V</span></p>' +
-          '<div class="btn-row" style="justify-content:center;margin-top:10px">' +
-            '<button class="btn btn-sm" type="button" id="btn-pick">' + U.icon('image') + ' Chọn ảnh</button>' +
-          '</div>' +
-          '<input type="file" id="f-files" accept="image/*" multiple hidden>' +
-        '</div>' +
-        '<div class="shots" id="shots" style="margin-top:12px"></div>' +
-
-        '<div class="btn-row" style="margin-top:18px">' +
-          '<button class="btn btn-primary btn-lg btn-block" type="submit">' + U.icon('send') + ' ' +
-            (editing ? 'Cập nhật &amp; gửi duyệt lại' : 'Gửi báo cáo') + '</button>' +
-          (editing ? '<a class="btn btn-block" href="#/list">Huỷ</a>' : '') +
-        '</div>' +
-      '</div></div>' +
-
-      '</div></form>';
-
-    /* --- ảnh --- */
-    var shotsEl = U.$('#shots', main);
-
-    function paintShots() {
-      var html = '';
-      keptImgs.forEach(function (im, i) {
-        html += '<div class="shot" style="cursor:default">' +
-          '<img src="' + urlOf(im.blob) + '" alt="Ảnh đã đính kèm ' + (i + 1) + '">' +
-          '<button class="shot-del" type="button" data-kept="' + i + '" aria-label="Gỡ ảnh này">' + U.icon('x') + '</button></div>';
-      });
-      pendingImgs.forEach(function (im, i) {
-        html += '<div class="shot" style="cursor:default">' +
-          '<img src="' + im.url + '" alt="Ảnh mới ' + (i + 1) + '">' +
-          '<button class="shot-del" type="button" data-new="' + i + '" aria-label="Gỡ ảnh này">' + U.icon('x') + '</button></div>';
-      });
-      shotsEl.innerHTML = html;
+    function rowById(id) {
+      return sendDraft.rows.filter(function (r) { return r.id === id; })[0];
     }
 
-    if (editing) {
-      Store.imagesOf(editing.id).then(function (list) { keptImgs = list; paintShots(); });
-    }
-
-    shotsEl.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-new],[data-kept]');
-      if (!b) return;
-      if (b.hasAttribute('data-new')) pendingImgs.splice(Number(b.getAttribute('data-new')), 1);
-      else keptImgs.splice(Number(b.getAttribute('data-kept')), 1);
-      paintShots();
+    /* gõ vào ô — cập nhật ngay, không vẽ lại để khỏi mất con trỏ */
+    main.addEventListener('input', function (e) {
+      var t = e.target;
+      if (t.hasAttribute('data-head')) { sendDraft[t.getAttribute('data-head')] = t.value; return; }
+      if (!t.hasAttribute('data-f')) return;
+      var r = rowById(t.getAttribute('data-r'));
+      if (!r) return;
+      var f = t.getAttribute('data-f');
+      r[f] = (f === 'hc' || f === 'tc') ? (t.value === '' ? '' : Number(t.value)) : t.value;
+      if (f === 'description') return;
+      refreshSendSummary(ctx);
     });
 
-    function addFiles(files) {
-      var imgs = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); });
-      if (!imgs.length) return;
-      Promise.all(imgs.map(function (f) {
-        return U.compressImage(f).then(function (o) {
-          return { blob: o.blob, w: o.w, h: o.h, name: f.name, url: urlOf(o.blob) };
-        }).catch(function () { return null; });
-      })).then(function (list) {
-        list.filter(Boolean).forEach(function (i) { pendingImgs.push(i); });
-        paintShots();
-        U.toast('Đã thêm ' + list.filter(Boolean).length + ' ảnh', 'ok');
-      });
-    }
+    main.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.hasAttribute('data-head')) {
+        sendDraft[t.getAttribute('data-head')] = t.value;
+        if (t.getAttribute('data-head') === 'date') redraw();
+        return;
+      }
+      if (!t.hasAttribute('data-f')) return;
+      var r = rowById(t.getAttribute('data-r'));
+      if (!r) return;
+      var f = t.getAttribute('data-f');
+      if (f === 'categoryId') { r.categoryId = t.value; return; }
+      if (f === 'timeFrom' || f === 'timeTo') {
+        r[f] = t.value;
+        autoHours(r, sendDraft.date);
+        redraw();
+        return;
+      }
+      if (f === 'projectId') { r.projectId = t.value; redraw(); }
+    });
 
-    var dz = U.$('#dz', main), fileInput = U.$('#f-files', main);
-    U.$('#btn-pick', main).addEventListener('click', function () { fileInput.click(); });
-    fileInput.addEventListener('change', function () { addFiles(fileInput.files); fileInput.value = ''; });
+    U.on(main, 'click', '[data-addrow]', function () {
+      var r = blankWorkRow();
+      var last = sendDraft.rows[sendDraft.rows.length - 1];
+      if (last) {                      /* nối tiếp giờ của dòng trước cho đỡ phải gõ */
+        r.projectId = last.projectId;
+        r.timeFrom = last.timeTo;
+        r.timeTo = S.settings.hcTo;
+      }
+      autoHours(r, sendDraft.date);
+      sendDraft.rows.push(r);
+      redraw();
+      var el = document.getElementById('f-proj-' + r.id);
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+
+    U.on(main, 'click', '[data-delrow]', function (e, b) {
+      var id = b.getAttribute('data-delrow');
+      sendDraft.rows = sendDraft.rows.filter(function (r) { return r.id !== id; });
+      if (pasteRow === id) pasteRow = null;
+      redraw();
+    });
+
+    U.on(main, 'click', '[data-img]', function (e, b) {
+      var id = b.getAttribute('data-img');
+      pasteRow = id;
+      workImageDialog(rowById(id), redraw);
+    });
+
+    U.on(main, 'click', '[data-submit]', function () { submitSend(ctx); });
+  }
+
+  /** Cập nhật dòng tổng mà không vẽ lại cả trang */
+  function refreshSendSummary(ctx) {
+    var el = U.$('.sd-sum', ctx.main);
+    if (!el) return;
+    var hc = sendDraft.rows.reduce(function (s, r) { return s + (Number(r.hc) || 0); }, 0);
+    var tc = sendDraft.rows.reduce(function (s, r) { return s + (Number(r.tc) || 0); }, 0);
+    el.innerHTML = sendDraft.rows.length + ' đầu việc · <b>' + U.hours(hc) + '</b> giờ HC · <b>' +
+      U.hours(tc) + '</b> giờ TC';
+  }
+
+  /** Hộp thoại ảnh của một đầu việc, dán được bằng Ctrl+V */
+  function workImageDialog(row, redraw) {
+    if (!row) return;
+    var el = U.openOverlay('<div class="dialog">' +
+      '<div class="dialog-head"><h3>Ảnh của đầu việc</h3>' +
+        '<button class="icon-btn" type="button" data-close aria-label="Đóng">' + U.icon('x') + '</button></div>' +
+      '<div class="dialog-body">' +
+        '<div class="dropzone" id="wi-dz" tabindex="0">' + U.icon('upload') +
+          '<p><b>Chụp bằng Snipping Tool rồi bấm Ctrl+V vào đây</b><br>' +
+          'hoặc kéo thả ảnh, hoặc chọn tệp</p>' +
+          '<div class="btn-row" style="justify-content:center;margin-top:10px">' +
+            '<button class="btn btn-sm" type="button" id="wi-pick">' + U.icon('image') + ' Chọn ảnh</button></div>' +
+          '<input type="file" id="wi-file" accept="image/*" multiple hidden></div>' +
+        '<div class="shots" id="wi-list" style="margin-top:14px"></div>' +
+      '</div>' +
+      '<div class="dialog-foot"><button class="btn btn-primary" type="button" data-close>Xong</button></div>' +
+    '</div>');
+
+    var listEl = U.$('#wi-list', el);
+
+    function refresh() {
+      var html = row.keep.map(function (im, i) {
+        return '<div class="shot" style="cursor:default"><img src="' + urlOf(im.blob) + '" alt="">' +
+          '<button class="shot-del" type="button" data-keep="' + i + '" aria-label="Gỡ ảnh">' +
+          U.icon('x') + '</button></div>';
+      }).join('') + row.imgs.map(function (im, i) {
+        return '<div class="shot" style="cursor:default"><img src="' + im.url + '" alt="">' +
+          '<button class="shot-del" type="button" data-new="' + i + '" aria-label="Gỡ ảnh">' +
+          U.icon('x') + '</button></div>';
+      }).join('');
+      listEl.innerHTML = html || '<p class="t-muted" style="font-size:13.5px">Chưa có ảnh nào.</p>';
+    }
+    refresh();
+
+    function take(files) { addRowImages(row, files).then(refresh).then(redraw); }
+
+    var dz = U.$('#wi-dz', el), fileEl = U.$('#wi-file', el);
+    U.$('#wi-pick', el).addEventListener('click', function () { fileEl.click(); });
+    fileEl.addEventListener('change', function () { take(fileEl.files); fileEl.value = ''; });
     ['dragenter', 'dragover'].forEach(function (ev) {
       dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('over'); });
     });
     ['dragleave', 'drop'].forEach(function (ev) {
       dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('over'); });
     });
-    dz.addEventListener('drop', function (e) { if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+    dz.addEventListener('drop', function (e) { if (e.dataTransfer) take(e.dataTransfer.files); });
 
-    main._onPaste = function (e) {
+    el.addEventListener('paste', function (e) {
       if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) {
-        addFiles(e.clipboardData.files);
+        e.preventDefault();
+        e.stopPropagation();
+        take(e.clipboardData.files);
       }
-    };
-    document.addEventListener('paste', main._onPaste);
-
-    /* --- lý do: chỉ hiện khi cần --- */
-    var reasonBtn = U.$('#btn-reason', main), reasonWrap = U.$('#reason-wrap', main);
-    reasonBtn.addEventListener('click', function () {
-      reasonWrap.hidden = !reasonWrap.hidden;
-      reasonBtn.textContent = reasonWrap.hidden
-        ? '+ Thêm lý do / mục tiêu (không bắt buộc)' : 'Ẩn lý do / mục tiêu';
-      if (!reasonWrap.hidden) U.$('#f-reason', main).focus();
     });
 
-    /* --- giờ HC / TC tự tính theo khung giờ --- */
-    function recalcHours() {
-      var res = U.splitHours(U.$('#f-from', main).value, U.$('#f-to', main).value, {
-        hcFrom: S.settings.hcFrom, hcTo: S.settings.hcTo,
-        lunchFrom: S.settings.lunchFrom, lunchTo: S.settings.lunchTo,
-        weekend: U.isWeekend(U.$('#f-date', main).value)
-      });
-      if (!res) return;
-      U.$('#f-hc', main).value = res.hc;
-      U.$('#f-tc', main).value = res.tc;
-      U.$('#calc-hint', main).textContent =
-        'Tự tính từ khung giờ: ' + U.hours(res.hc) + ' giờ HC, ' + U.hours(res.tc) + ' giờ TC — sửa lại được.';
+    el.addEventListener('click', function (e) {
+      if (e.target.closest('[data-close]')) return U.closeOverlay();
+      var k = e.target.closest('[data-keep]'), n = e.target.closest('[data-new]');
+      if (k) { row.keep.splice(Number(k.getAttribute('data-keep')), 1); refresh(); redraw(); }
+      if (n) { row.imgs.splice(Number(n.getAttribute('data-new')), 1); refresh(); redraw(); }
+    });
+  }
+
+  /** Kiểm tra rồi lưu: mỗi dòng thành một báo cáo */
+  function submitSend(ctx) {
+    var d = sendDraft, editing = ctx.editing;
+    var errEl = U.$('#sd-err', ctx.main);
+
+    function fail(msg) {
+      errEl.innerHTML = U.icon('alert') + '<span>' + U.esc(msg) + '</span>';
+      errEl.hidden = false;
+      errEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-    ['#f-from', '#f-to', '#f-date'].forEach(function (s) {
-      U.$(s, main).addEventListener('change', recalcHours);
-    });
-    if (!editing && r.hc === '') recalcHours();
 
-    /* --- gửi --- */
-    U.$('#rp-form', main).addEventListener('submit', function (e) {
-      e.preventDefault();
-      var errEl = U.$('#f-err', main);
-      var picked = U.$('input[name=cat]:checked', main);
-      var data = {
-        employeeId: isAdmin() && !editing ? U.$('#f-emp-of', main).value : targetEmp,
-        date: U.$('#f-date', main).value,
-        projectId: U.$('#f-proj', main).value,
-        categoryId: picked ? picked.value : '',
-        description: U.$('#f-desc', main).value.trim(),
-        reason: U.$('#f-reason', main).value.trim(),
-        timeFrom: U.$('#f-from', main).value,
-        timeTo: U.$('#f-to', main).value,
-        hc: Number(U.$('#f-hc', main).value) || 0,
-        tc: Number(U.$('#f-tc', main).value) || 0
-      };
+    if (!d.date) return fail('Vui lòng chọn ngày làm việc.');
+    if (!d.employeeId) return fail('Chưa có nhân viên nào — hãy thêm nhân viên trong Cài đặt trước.');
 
-      var miss = [];
-      if (!data.employeeId) miss.push('nhân viên (hãy thêm nhân viên trong Cài đặt trước)');
-      if (!data.date) miss.push('ngày làm việc');
-      if (!data.projectId) miss.push('công trình');
-      if (!data.description) miss.push('diễn giải công việc');
-      if (!data.timeFrom || !data.timeTo) miss.push('khung giờ');
-      if (data.hc + data.tc <= 0) miss.push('số giờ (HC hoặc TC phải lớn hơn 0)');
-      if (miss.length) {
-        errEl.innerHTML = U.icon('alert') + '<span>Còn thiếu: ' + U.esc(miss.join(', ')) + '.</span>';
-        errEl.hidden = false;
-        errEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        return;
-      }
-      errEl.hidden = true;
+    for (var i = 0; i < d.rows.length; i++) {
+      var r = d.rows[i], miss = [];
+      if (!r.projectId) miss.push('công trình');
+      if (!String(r.description).trim()) miss.push('nội dung công việc');
+      if (!r.timeFrom || !r.timeTo) miss.push('khung giờ');
+      if ((Number(r.hc) || 0) + (Number(r.tc) || 0) <= 0) miss.push('số giờ');
+      if (miss.length) return fail('Đầu việc ' + (i + 1) + ' còn thiếu: ' + miss.join(', ') + '.');
+    }
+    errEl.hidden = true;
 
-      var rec = editing
-        ? Object.assign({}, editing, data, { status: 'pending', reviewNote: '', reviewedBy: '', reviewedAt: 0 })
-        : Object.assign({ status: 'pending', reviewNote: '', reviewedBy: '', reviewedAt: 0 }, data);
-
-      Store.saveReport(rec)
-        .then(function (saved) {
+    /* Lưu lần lượt từng dòng để các giao dịch CSDL không chồng lên nhau */
+    var saved = 0;
+    var chain = d.rows.reduce(function (pr, r) {
+      return pr.then(function () {
+        var rec = Object.assign({}, editing || {}, {
+          employeeId: d.employeeId,
+          date: d.date,
+          projectId: r.projectId,
+          categoryId: r.categoryId,
+          description: String(r.description).trim(),
+          reason: String(r.reason).trim(),
+          timeFrom: r.timeFrom,
+          timeTo: r.timeTo,
+          hc: Number(r.hc) || 0,
+          tc: Number(r.tc) || 0,
+          status: 'pending', reviewNote: '', reviewedBy: '', reviewedAt: 0
+        });
+        return Store.saveReport(rec).then(function (rep) {
           var work = [];
           if (editing) {
-            work.push(Store.imagesOf(saved.id).then(function (old) {
-              var keep = keptImgs.map(function (k) { return k.id; });
+            work.push(Store.imagesOf(rep.id).then(function (old) {
+              var keep = r.keep.map(function (k) { return k.id; });
               return Promise.all(old.filter(function (o) { return keep.indexOf(o.id) < 0; })
                 .map(function (o) { return Store.del('images', o.id); }));
             }));
           }
-          pendingImgs.forEach(function (im) {
-            work.push(Store.addImage(saved.id, im.blob, im.w, im.h, im.name));
+          r.imgs.forEach(function (im) {
+            work.push(Store.addImage(rep.id, im.blob, im.w, im.h, im.name));
           });
           return Promise.all(work).then(function () {
-            saved.imageCount = keptImgs.length + pendingImgs.length;
-            return Store.put('reports', saved);
+            rep.imageCount = r.keep.length + r.imgs.length;
+            saved++;
+            return Store.put('reports', rep);
           });
-        })
-        .then(function () {
-          U.toast(editing ? 'Đã cập nhật và gửi duyệt lại' : 'Đã gửi báo cáo, chờ quản lý duyệt', 'ok');
-          return reload();
-        })
-        .then(function () { go('list', { month: U.monthISO(data.date), status: 'pending' }); })
-        .catch(function (err) { U.toast('Lỗi khi lưu: ' + err.message, 'err'); });
-    });
+        });
+      });
+    }, Promise.resolve());
+
+    chain
+      .then(function () {
+        U.toast(editing ? 'Đã cập nhật và gửi duyệt lại' : 'Đã gửi ' + saved + ' báo cáo, chờ quản lý duyệt', 'ok');
+        sendDraft = null; sendDraftKey = ''; pasteRow = null;
+        return reload();
+      })
+      .then(function () { go('list', { month: U.monthISO(d.date), status: 'pending' }); })
+      .catch(function (err) { fail('Lỗi khi lưu: ' + err.message); });
   }
 
   /* =========================================================
