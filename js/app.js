@@ -1678,15 +1678,14 @@
 
           /* 3 — Biểu đồ, tách theo nhiều chiều */
           '<div class="card" style="margin-top:20px"><div class="card-body">' +
-            '<figure class="chart-figure chart-wide">' +
-              '<figcaption>Giờ công theo từng ngày trong tháng</figcaption>' +
-              '<div class="chart" id="chart-days"></div></figure>' +
-            '<div class="chart-grid" style="margin-top:22px">' +
+            '<div class="chart-grid">' +
               '<figure class="chart-figure">' +
-                '<figcaption>Thời gian theo công trình (giờ)</figcaption>' +
+                '<figcaption>Thời gian theo công trình (giờ)' +
+                  '<span class="cap-hint">bấm vào một công trình để xem chi tiết</span></figcaption>' +
                 '<div class="chart" id="chart-proj"></div></figure>' +
               '<figure class="chart-figure">' +
-                '<figcaption>Tỷ trọng theo hạng mục</figcaption>' +
+                '<figcaption>Tỷ trọng theo hạng mục' +
+                  '<span class="cap-hint">bấm vào một phần để xem chi tiết</span></figcaption>' +
                 '<div class="chart" id="chart-cat"></div></figure>' +
             '</div>' +
             (single ? '' :
@@ -1698,6 +1697,7 @@
                   '<figcaption>Giờ hành chính so với tăng ca theo nhân viên</figcaption>' +
                   '<div class="chart" id="chart-ot"></div></figure>' +
               '</div>') +
+            drillHtml(q.drill, rows, single) +
           '</div></div>' +
 
           /* 4 — Phần chi tiết, gập lại cho đỡ rối */
@@ -1712,40 +1712,35 @@
     var sel = U.$('#f-emp', fbar); if (sel) sel.addEventListener('change', function () { setQ({ emp: sel.value }); });
     U.$('#btn-print', main).addEventListener('click', function () { window.print(); });
     U.$('#btn-csv', main).addEventListener('click', function () { exportSummaryXLSX(single, month, agg, rows); });
+    U.on(main, 'click', '[data-drillclose]', function () { setQ({ drill: '' }); });
 
     if (!rows.length) return;
 
     /* Biểu đồ — vẽ sau khi DOM có sẵn kích thước */
+    var projKeys = Object.keys(agg.byProject).sort(function (a, b) {
+      return (agg.byProject[b].hc + agg.byProject[b].tc) - (agg.byProject[a].hc + agg.byProject[a].tc);
+    });
     Charts.bars(U.$('#chart-proj', main), {
       unit: 'giờ',
       aria: 'Biểu đồ cột tổng thời gian theo công trình',
-      items: Object.keys(agg.byProject).map(function (k) {
+      activeIndex: drillIndex('proj', projKeys, q.drill),
+      onPick: function (it, i) { toggleDrill('proj', projKeys[i], q.drill); },
+      items: projKeys.map(function (k) {
         var v = agg.byProject[k];
         return { label: proj(k).name, value: U.round2(v.hc + v.tc), parts: [{ name: 'Giờ HC', value: v.hc }, { name: 'Giờ TC', value: v.tc }] };
-      }).sort(function (a, b) { return b.value - a.value; })
-    });
-
-    Charts.donut(U.$('#chart-cat', main), {
-      unit: 'giờ',
-      aria: 'Biểu đồ tỷ trọng thời gian theo hạng mục',
-      items: S.categories.filter(function (c) { return agg.byCategory[c.id]; }).map(function (c) {
-        var v = agg.byCategory[c.id];
-        return { label: c.name, value: U.round2(v.hc + v.tc), hex: c.hex };
       })
     });
 
-    /* Giờ công theo từng ngày — cho thấy ngày nào dồn việc, ngày nào tăng ca */
-    var byDay = {};
-    rows.forEach(function (r) {
-      if (!byDay[r.date]) byDay[r.date] = { hc: 0, tc: 0 };
-      byDay[r.date].hc += Number(r.hc) || 0;
-      byDay[r.date].tc += Number(r.tc) || 0;
-    });
-    Charts.columns(U.$('#chart-days', main), {
-      aria: 'Biểu đồ giờ công theo từng ngày trong tháng',
-      items: U.daysOfMonth(month).map(function (d) {
-        var v = byDay[d] || { hc: 0, tc: 0 };
-        return { label: U.weekdayVN(d) + ' ' + U.dayShort(d), short: d.slice(8), a: v.hc, b: v.tc };
+    var catList = S.categories.filter(function (c) { return agg.byCategory[c.id]; });
+    var catKeys = catList.map(function (c) { return c.id; });
+    Charts.donut(U.$('#chart-cat', main), {
+      unit: 'giờ',
+      aria: 'Biểu đồ tỷ trọng thời gian theo hạng mục',
+      activeIndex: drillIndex('cat', catKeys, q.drill),
+      onPick: function (it, i) { toggleDrill('cat', catKeys[i], q.drill); },
+      items: catList.map(function (c) {
+        var v = agg.byCategory[c.id];
+        return { label: c.name, value: U.round2(v.hc + v.tc), hex: c.hex };
       })
     });
 
@@ -1805,6 +1800,104 @@
   }
 
   /** Hai bảng cạnh nhau như trong file Excel: theo công trình và theo hạng mục */
+  /* ---------------- Bấm vào biểu đồ để xem chi tiết ----------------
+     Trả lời câu hỏi: ai đã dành bao nhiêu giờ cho việc này, và quy ra
+     tiền công là bao nhiêu. */
+
+  function drillIndex(kind, keys, drill) {
+    if (!drill) return -1;
+    var p = String(drill).split(':');
+    return p[0] === kind ? keys.indexOf(p[1]) : -1;
+  }
+
+  function toggleDrill(kind, id, current) {
+    var next = kind + ':' + id;
+    setQ({ drill: current === next ? '' : next });
+  }
+
+  /** Tiền công quy đổi từ số giờ của một nhân viên */
+  function costOf(e, hc, tc) {
+    var rate = Store.hourlyRate(e, S.settings);
+    var ot = Number(S.settings.otRate) || 1.5;
+    return hc * rate + tc * rate * ot;
+  }
+
+  function drillHtml(drill, rows, single) {
+    if (!drill) return '';
+    var p = String(drill).split(':');
+    var kind = p[0], id = p[1];
+    if (kind !== 'cat' && kind !== 'proj') return '';
+
+    var subset = rows.filter(function (r) {
+      return kind === 'cat' ? r.categoryId === id : r.projectId === id;
+    });
+    if (!subset.length) return '';
+
+    var title = kind === 'cat' ? cat(id).name : proj(id).name;
+    var color = kind === 'cat' ? cat(id).hex : 'var(--brand-600)';
+
+    /* Xem toàn bộ nhân viên thì tách theo người; xem một người thì tách
+       theo chiều còn lại, vì tách theo người sẽ chỉ có đúng một dòng. */
+    var byPerson = !single;
+    var bag = {};
+    subset.forEach(function (r) {
+      var k = byPerson ? r.employeeId : (kind === 'cat' ? r.projectId : r.categoryId);
+      if (!bag[k]) bag[k] = { hc: 0, tc: 0, n: 0 };
+      bag[k].hc += Number(r.hc) || 0;
+      bag[k].tc += Number(r.tc) || 0;
+      bag[k].n++;
+    });
+
+    function nameOf(k) {
+      if (byPerson) return emp(k).name;
+      return kind === 'cat' ? proj(k).name : cat(k).name;
+    }
+
+    var keys = Object.keys(bag).sort(function (a, b) {
+      return (bag[b].hc + bag[b].tc) - (bag[a].hc + bag[a].tc);
+    });
+
+    var tHC = 0, tTC = 0, tMoney = 0;
+    var body = keys.map(function (k, i) {
+      var v = bag[k];
+      var who = byPerson ? emp(k) : single;
+      var money = costOf(who, v.hc, v.tc);
+      tHC += v.hc; tTC += v.tc; tMoney += money;
+      return '<tr><td class="c num">' + (i + 1) + '</td>' +
+        '<td class="t-strong t-wrap">' + U.esc(nameOf(k)) + '</td>' +
+        '<td class="n">' + v.n + '</td>' +
+        '<td class="n">' + U.hours(v.hc) + '</td>' +
+        '<td class="n">' + U.hours(v.tc) + '</td>' +
+        '<td class="n t-strong">' + U.hours(v.hc + v.tc) + '</td>' +
+        '<td class="n t-strong">' + U.vnd(money) + '</td></tr>';
+    }).join('');
+
+    return '<div class="drill" style="--dc:' + color + '">' +
+      '<div class="drill-head">' +
+        '<span class="drill-dot"></span>' +
+        '<div><b>' + U.esc(title) + '</b>' +
+          '<div class="drill-sub">' + U.hours(tHC + tTC) + ' giờ · ' + U.vnd(tMoney) +
+            ' · ' + subset.length + ' đầu việc</div></div>' +
+        '<div class="grow"></div>' +
+        '<button class="btn btn-sm" type="button" data-drillclose>' + U.icon('x') + ' Đóng</button>' +
+      '</div>' +
+      '<div class="table-scroll"><table class="tbl">' +
+        '<thead><tr><th class="c">STT</th>' +
+          '<th>' + (byPerson ? 'Nhân viên' : (kind === 'cat' ? 'Công trình' : 'Hạng mục')) + '</th>' +
+          '<th class="n">Đầu việc</th><th class="n">Giờ HC</th><th class="n">Giờ TC</th>' +
+          '<th class="n">Tổng giờ</th><th class="n">Quy ra tiền công</th></tr></thead>' +
+        '<tbody>' + body + '</tbody>' +
+        '<tfoot><tr><td colspan="2">TỔNG CỘNG</td><td class="n">' + subset.length + '</td>' +
+          '<td class="n">' + U.hours(tHC) + '</td><td class="n">' + U.hours(tTC) + '</td>' +
+          '<td class="n">' + U.hours(tHC + tTC) + '</td>' +
+          '<td class="n">' + U.vnd(tMoney) + '</td></tr></tfoot>' +
+      '</table></div>' +
+      '<p class="help" style="padding:10px 16px 14px">' + U.icon('info') +
+        ' Tiền công quy đổi theo đơn giá giờ của từng người, giờ tăng ca nhân hệ số ' +
+        U.num(S.settings.otRate, 1) + '.</p>' +
+    '</div>';
+  }
+
   function sectionTables(agg) {
     var keys = Object.keys(agg.byProject).sort(function (a, b) {
       return (agg.byProject[b].hc + agg.byProject[b].tc) - (agg.byProject[a].hc + agg.byProject[a].tc);
@@ -3031,37 +3124,202 @@
     });
   }
 
-  function tabCategories(body) {
-    body.innerHTML = '<div class="card">' +
-      '<div class="card-head"><h3>Hạng mục công việc</h3></div>' +
-      '<div class="card-body">' +
-        '<p class="help" style="margin-bottom:16px">Ba hạng mục này quyết định màu sắc và cách nhóm trong báo cáo tổng hợp. ' +
-        'Bảng màu đã được kiểm tra để người mù màu vẫn phân biệt được.</p>' +
-        '<div class="chart-grid">' +
-          S.categories.map(function (c) {
-            return '<div class="card" style="margin:0"><div class="card-body">' +
-              '<div style="display:flex;align-items:center;gap:12px">' +
-                '<span style="width:34px;height:34px;border-radius:8px;background:' + c.hex + ';flex:none"></span>' +
-                '<div><b>' + U.esc(c.name) + '</b><br><span class="help num">' + U.esc(c.hex) + '</span></div>' +
-              '</div>' +
-              '<div class="field" style="margin:16px 0 0"><label for="c-' + c.id + '">Đổi tên hiển thị</label>' +
-                '<input class="input" id="c-' + c.id + '" value="' + U.esc(c.name) + '" data-cat="' + c.id + '"></div>' +
-            '</div></div>';
-          }).join('') +
-        '</div>' +
-        '<div class="btn-row" style="margin-top:18px"><button class="btn btn-primary" data-save-cats>' +
-          U.icon('check') + ' Lưu tên hạng mục</button></div>' +
-      '</div></div>';
+  /* Bảng màu cho hạng mục — đã chạy bộ kiểm định mù màu, xếp theo thứ tự
+     an toàn nhất khi các màu nằm cạnh nhau trên biểu đồ. */
+  var CAT_COLORS = [
+    { hex: '#2A78D6', name: 'Xanh dương' },
+    { hex: '#EB6834', name: 'Cam' },
+    { hex: '#1BAF7A', name: 'Xanh ngọc' },
+    { hex: '#EDA100', name: 'Vàng' },
+    { hex: '#E87BA4', name: 'Hồng' },
+    { hex: '#4A3AA7', name: 'Tím' },
+    { hex: '#008300', name: 'Xanh lá' },
+    { hex: '#E34948', name: 'Đỏ' }
+  ];
 
-    U.on(body, 'click', '[data-save-cats]', function () {
-      Promise.all(U.$$('[data-cat]', body).map(function (i) {
-        var c = cat(i.getAttribute('data-cat'));
-        var v = i.value.trim();
-        if (!v || v === c.name) return Promise.resolve();
-        return Store.put('categories', Object.assign({}, c, { name: v }));
-      })).then(function () {
-        U.toast('Đã lưu tên hạng mục', 'ok'); return reload();
+  function catUsage(id) {
+    return S.reports.filter(function (r) { return r.categoryId === id; }).length;
+  }
+
+  function tabCategories(body) {
+    var list = S.categories;
+
+    body.innerHTML = '<div class="card">' +
+      '<div class="card-head"><h3>Hạng mục công việc</h3><div class="grow"></div>' +
+        '<button class="btn btn-primary btn-sm" data-new-cat>' + U.icon('plus') + ' Thêm hạng mục</button></div>' +
+      '<div class="card-body flush"><div class="table-scroll"><table class="tbl">' +
+        '<thead><tr><th style="width:52px" class="c">Màu</th><th>Tên hạng mục</th>' +
+        '<th class="num">Mã màu</th><th class="n">Đang dùng</th>' +
+        '<th style="width:96px" class="c">Thứ tự</th><th style="width:150px"></th></tr></thead><tbody>' +
+        list.map(function (c, i) {
+          var used = catUsage(c.id);
+          return '<tr><td class="c">' +
+              '<span style="display:inline-block;width:24px;height:24px;border-radius:6px;background:' +
+              c.hex + '"></span></td>' +
+            '<td class="t-strong">' + U.esc(c.name) + '</td>' +
+            '<td class="num t-muted">' + U.esc(c.hex) + '</td>' +
+            '<td class="n">' + (used ? used + ' báo cáo' : '<span class="t-muted">chưa dùng</span>') + '</td>' +
+            '<td class="c"><div class="btn-row" style="flex-wrap:nowrap;justify-content:center">' +
+              '<button class="btn btn-sm" data-cmove="' + c.id + ':-1"' + (i === 0 ? ' disabled' : '') +
+                ' aria-label="Đưa lên trên">' + U.icon('chevronL') + '</button>' +
+              '<button class="btn btn-sm" data-cmove="' + c.id + ':1"' + (i === list.length - 1 ? ' disabled' : '') +
+                ' aria-label="Đưa xuống dưới">' + U.icon('chevronR') + '</button></div></td>' +
+            '<td class="n"><div class="btn-row" style="flex-wrap:nowrap;justify-content:flex-end">' +
+              '<button class="btn btn-sm" data-edit-cat="' + c.id + '">' + U.icon('edit') + ' Sửa</button>' +
+              '<button class="btn btn-sm btn-danger" data-del-cat="' + c.id + '" ' +
+                'aria-label="Xoá hạng mục">' + U.icon('trash') + '</button></div></td></tr>';
+        }).join('') +
+      '</tbody></table></div></div></div>' +
+
+      '<div class="callout" style="margin-top:16px">' + U.icon('info') +
+        '<span>Hạng mục quyết định màu sắc và cách nhóm trong báo cáo tổng hợp. ' +
+        'Bảng màu đã được kiểm tra để người mù màu vẫn phân biệt được — ' +
+        '<b>từ 8 hạng mục trở lên thì các màu bắt đầu khó phân biệt</b>, nên gom bớt nếu có thể.</span></div>';
+
+    U.on(body, 'click', '[data-new-cat]', function () { editCategory(null); });
+    U.on(body, 'click', '[data-edit-cat]', function (e, b) { editCategory(cat(b.getAttribute('data-edit-cat'))); });
+    U.on(body, 'click', '[data-del-cat]', function (e, b) { deleteCategory(cat(b.getAttribute('data-del-cat'))); });
+
+    U.on(body, 'click', '[data-cmove]', function (e, b) {
+      var p = b.getAttribute('data-cmove').split(':');
+      var arr = S.categories.slice();
+      var i = arr.map(function (x) { return x.id; }).indexOf(p[0]);
+      var j = i + Number(p[1]);
+      if (j < 0 || j >= arr.length) return;
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      Promise.all(arr.map(function (c, k) {
+        return Store.put('categories', Object.assign({}, c, { order: k + 1 }));
+      })).then(reload).then(render);
+    });
+  }
+
+  function editCategory(c) {
+    var isNew = !c;
+    var used = isNew ? 0 : catUsage(c.id);
+    if (isNew) {
+      var taken = S.categories.map(function (x) { return String(x.hex).toUpperCase(); });
+      var free = CAT_COLORS.filter(function (x) { return taken.indexOf(x.hex) < 0; })[0] || CAT_COLORS[0];
+      c = { id: '', name: '', hex: free.hex, order: S.categories.length + 1 };
+    }
+
+    var el = U.openOverlay('<div class="dialog" style="max-width:520px">' +
+      '<div class="dialog-head"><h3>' + (isNew ? 'Thêm hạng mục' : 'Sửa hạng mục') + '</h3>' +
+        '<button class="icon-btn" type="button" data-close aria-label="Đóng">' + U.icon('x') + '</button></div>' +
+      '<div class="dialog-body">' +
+        '<div class="field"><label for="c-name">Tên hạng mục <span class="req">*</span></label>' +
+          '<input class="input" id="c-name" value="' + U.esc(c.name) + '" ' +
+            'placeholder="Ví dụ: Kiến trúc, Nội thất, Triển khai"></div>' +
+
+        '<div class="field"><span class="field-label">Màu hiển thị</span>' +
+          '<div class="cat-swatches" id="c-colors">' +
+            CAT_COLORS.map(function (x) {
+              var dup = S.categories.some(function (o) {
+                return o.id !== c.id && String(o.hex).toUpperCase() === x.hex;
+              });
+              return '<button type="button" class="cat-sw' +
+                (String(c.hex).toUpperCase() === x.hex ? ' on' : '') + (dup ? ' dup' : '') + '" ' +
+                'data-hex="' + x.hex + '" style="--sw:' + x.hex + '" ' +
+                'title="' + x.name + (dup ? ' — đang dùng cho hạng mục khác' : '') + '" ' +
+                'aria-label="' + x.name + '"></button>';
+            }).join('') +
+          '</div>' +
+          '<span class="help">Màu có dấu chấm là đang dùng cho hạng mục khác, nên tránh trùng.</span></div>' +
+
+        (used ? '<div class="callout" style="margin-top:6px">' + U.icon('info') +
+          '<span>Hạng mục này đang được dùng ở <b>' + used + ' báo cáo</b>. ' +
+          'Đổi tên hay màu sẽ áp dụng cho tất cả.</span></div>' : '') +
+        '<span class="err" id="c-err" hidden></span>' +
+      '</div>' +
+      '<div class="dialog-foot"><button class="btn" type="button" data-close>Huỷ</button>' +
+        '<button class="btn btn-primary" type="button" data-save>' + U.icon('check') + ' Lưu</button></div>' +
+    '</div>');
+
+    var hex = String(c.hex).toUpperCase();
+    U.on(el, 'click', '[data-hex]', function (e, b) {
+      hex = b.getAttribute('data-hex');
+      U.$$('.cat-sw', el).forEach(function (x) {
+        x.classList.toggle('on', x.getAttribute('data-hex') === hex);
+      });
+    });
+
+    el.addEventListener('click', function (ev) {
+      if (ev.target.closest('[data-close]')) return U.closeOverlay();
+      if (!ev.target.closest('[data-save]')) return;
+      var name = U.$('#c-name', el).value.trim();
+      if (!name) {
+        var errEl = U.$('#c-err', el);
+        errEl.innerHTML = U.icon('alert') + '<span>Vui lòng nhập tên hạng mục.</span>';
+        errEl.hidden = false;
+        return;
+      }
+      var rec = {
+        id: c.id || U.uid('cat'),
+        name: name, hex: hex, color: hex,
+        order: c.order || (S.categories.length + 1)
+      };
+      Store.put('categories', rec).then(function () {
+        U.closeOverlay();
+        U.toast(isNew ? 'Đã thêm hạng mục' : 'Đã lưu hạng mục', 'ok');
+        return reload();
       }).then(render);
+    });
+  }
+
+  function deleteCategory(c) {
+    if (!c || !c.id) return;
+    if (S.categories.length <= 1) {
+      return U.toast('Phải giữ lại ít nhất một hạng mục', 'err');
+    }
+    var used = catUsage(c.id);
+    var others = S.categories.filter(function (x) { return x.id !== c.id; });
+
+    if (!used) {
+      return U.confirmDialog({
+        title: 'Xoá hạng mục',
+        message: 'Xoá hạng mục “' + c.name + '”? Chưa có báo cáo nào dùng hạng mục này.',
+        okText: 'Xoá', danger: true
+      }).then(function (ok) {
+        if (!ok) return;
+        return Store.del('categories', c.id)
+          .then(function () { U.toast('Đã xoá hạng mục', 'ok'); return reload(); })
+          .then(render);
+      });
+    }
+
+    /* Đang có báo cáo dùng hạng mục này — phải chuyển sang hạng mục khác
+       chứ không được xoá trắng, nếu không các báo cáo đó mất phân loại. */
+    var el = U.openOverlay('<div class="dialog" style="max-width:480px">' +
+      '<div class="dialog-head"><h3>Xoá hạng mục</h3>' +
+        '<button class="icon-btn" type="button" data-close aria-label="Đóng">' + U.icon('x') + '</button></div>' +
+      '<div class="dialog-body">' +
+        '<div class="callout warn" style="margin-bottom:16px">' + U.icon('alert') +
+          '<span>Có <b>' + used + ' báo cáo</b> đang dùng hạng mục “' + U.esc(c.name) + '”. ' +
+          'Hãy chọn hạng mục để chuyển số báo cáo đó sang.</span></div>' +
+        '<div class="field"><label for="dc-to">Chuyển sang hạng mục <span class="req">*</span></label>' +
+          '<select class="select" id="dc-to">' +
+            others.map(function (x) {
+              return '<option value="' + x.id + '">' + U.esc(x.name) + '</option>';
+            }).join('') +
+          '</select></div>' +
+      '</div>' +
+      '<div class="dialog-foot"><button class="btn" type="button" data-close>Huỷ</button>' +
+        '<button class="btn btn-danger" type="button" data-save>' + U.icon('trash') +
+          ' Chuyển và xoá</button></div>' +
+    '</div>');
+
+    el.addEventListener('click', function (ev) {
+      if (ev.target.closest('[data-close]')) return U.closeOverlay();
+      if (!ev.target.closest('[data-save]')) return;
+      var to = U.$('#dc-to', el).value;
+      var moved = S.reports.filter(function (r) { return r.categoryId === c.id; });
+      moved.forEach(function (r) { r.categoryId = to; });
+      Store.putMany('reports', moved)
+        .then(function () { return Store.del('categories', c.id); })
+        .then(function () {
+          U.closeOverlay();
+          U.toast('Đã chuyển ' + moved.length + ' báo cáo và xoá hạng mục', 'ok');
+          return reload();
+        }).then(render);
     });
   }
 

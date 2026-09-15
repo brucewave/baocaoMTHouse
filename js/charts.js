@@ -46,13 +46,15 @@
       return;
     }
 
-    var html = '<div class="bars" role="img" aria-label="' +
+    var pick = typeof opt.onPick === 'function';
+    var html = '<div class="bars' + (pick ? ' pickable' : '') + '" role="img" aria-label="' +
       U.esc(opt.aria || ('Biểu đồ cột so sánh ' + unit)) + '">';
 
     items.forEach(function (it, i) {
       var w = Math.max(1.5, (it.value / max) * 100);
       html +=
-        '<div class="bar-row" tabindex="0" data-i="' + i + '">' +
+        '<div class="bar-row' + (opt.activeIndex === i ? ' on' : '') + '" tabindex="0" ' +
+          (pick ? 'role="button" ' : '') + 'data-i="' + i + '">' +
           '<div class="bar-label" title="' + U.esc(it.label) + '">' + U.esc(it.label) + '</div>' +
           '<div class="bar-track"><i style="width:' + w.toFixed(2) + '%"></i></div>' +
           '<div class="bar-value num">' + U.hours(it.value) + '</div>' +
@@ -79,6 +81,12 @@
         showTip(tipFor(i), r.left + r.width / 2, r.top);
       });
       row.addEventListener('blur', hideTip);
+      if (pick) {
+        row.addEventListener('click', function () { opt.onPick(items[i], i); });
+        row.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.onPick(items[i], i); }
+        });
+      }
     });
   }
 
@@ -119,6 +127,7 @@
       return;
     }
 
+    var pick = typeof opt.onPick === 'function';
     var S = 260, cx = 130, cy = 130, ro = 104, ri = 64;
     var gap = items.length > 1 ? 1.6 : 0;      /* khe 2px giữa các mảng, không vẽ viền */
     var acc = 0, paths = '', labels = '';
@@ -130,8 +139,9 @@
       if (a1 < a0) a1 = a0;
       acc += frac;
 
-      paths += '<path d="' + ring(cx, cy, ro, ri, a0, a1) + '" fill="' + it.hex +
-        '" data-i="' + i + '" tabindex="0" role="img" aria-label="' +
+      paths += '<path class="' + (pick ? 'pickable' : '') +
+        (opt.activeIndex === i ? ' on' : '') + '" d="' + ring(cx, cy, ro, ri, a0, a1) + '" fill="' + it.hex +
+        '" data-i="' + i + '" tabindex="0" role="' + (pick ? 'button' : 'img') + '" aria-label="' +
         U.esc(it.label + ': ' + U.hours(it.value) + ' ' + unit + ', ' + U.pct(it.value, total)) + '"/>';
 
       /* Nhãn trực tiếp — chỉ khi mảng đủ rộng để chữ không bị cắt */
@@ -179,6 +189,12 @@
         showTip(tipFor(i), r.left + r.width / 2, r.top + r.height / 2);
       });
       p.addEventListener('blur', hideTip);
+      if (pick) {
+        p.addEventListener('click', function () { opt.onPick(items[i], i); });
+        p.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.onPick(items[i], i); }
+        });
+      }
     });
   }
 
