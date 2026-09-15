@@ -182,5 +182,114 @@
     });
   }
 
-  global.Charts = { bars: bars, donut: donut, hideTip: hideTip };
+
+  /* =========================================================
+     Cột chồng theo ngày — giờ hành chính ở dưới, tăng ca ở trên
+     items: [{ label, a, b }]   a = giờ HC, b = giờ TC
+     ========================================================= */
+  function columns(el, opt) {
+    var items = (opt.items || []);
+    var unit = opt.unit || 'giờ';
+    var nameA = opt.nameA || 'Giờ HC';
+    var nameB = opt.nameB || 'Giờ TC';
+    var colA = opt.colA || '#2A78D6';
+    var colB = opt.colB || '#EB6834';
+
+    var max = 0;
+    items.forEach(function (it) { max = Math.max(max, (it.a || 0) + (it.b || 0)); });
+    if (!items.length || !max) {
+      el.innerHTML = '<p class="t-muted" style="font-size:14px;padding:12px 0">Chưa có dữ liệu trong kỳ đã chọn.</p>';
+      return;
+    }
+
+    var W = 720, H = 210;
+    var padL = 40, padR = 6, padT = 10, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var step = plotW / items.length;
+    var barW = Math.max(4, Math.min(26, step * 0.62));
+
+    /* thang chia tròn số cho dễ đọc */
+    var nice = Math.pow(10, Math.floor(Math.log(max) / Math.LN10));
+    var tick = Math.ceil(max / 4 / nice) * nice;
+    var top = Math.max(tick * 4, max);
+
+    function y(v) { return padT + plotH - (v / top) * plotH; }
+
+    var g = '';
+    for (var t = 0; t <= top + 0.001; t += tick) {
+      var yy = y(t);
+      g += '<line x1="' + padL + '" y1="' + yy.toFixed(1) + '" x2="' + (W - padR) +
+        '" y2="' + yy.toFixed(1) + '" stroke="var(--grid)" stroke-width="1"/>' +
+        '<text x="' + (padL - 6) + '" y="' + (yy + 3.5).toFixed(1) + '" text-anchor="end" ' +
+        'font-size="10" fill="var(--ink-3)">' + U.num(t, t % 1 ? 1 : 0) + '</text>';
+    }
+
+    /* nhãn trục ngang thưa bớt khi nhiều cột để chữ không chồng nhau */
+    var everyN = Math.ceil(items.length / 14);
+    var bars = '', labels = '';
+
+    items.forEach(function (it, i) {
+      var cx = padL + step * i + step / 2;
+      var x = cx - barW / 2;
+      var a = it.a || 0, b = it.b || 0;
+      var yA = y(a), yB = y(a + b);
+      var hA = padT + plotH - yA;
+      var hB = a > 0 ? (yA - yB - 2) : (yA - yB);   /* chừa 2px giữa hai mảng */
+
+      if (a > 0) {
+        bars += '<rect x="' + x.toFixed(1) + '" y="' + yA.toFixed(1) + '" width="' + barW.toFixed(1) +
+          '" height="' + Math.max(1, hA).toFixed(1) + '" fill="' + colA + '"' +
+          (b > 0 ? '' : ' rx="3"') + ' data-i="' + i + '"/>';
+      }
+      if (b > 0 && hB > 0) {
+        bars += '<rect x="' + x.toFixed(1) + '" y="' + yB.toFixed(1) + '" width="' + barW.toFixed(1) +
+          '" height="' + Math.max(1, hB).toFixed(1) + '" fill="' + colB + '" rx="3" data-i="' + i + '"/>';
+      }
+      /* vùng bắt chuột rộng hơn cột cho dễ trỏ */
+      bars += '<rect x="' + (cx - step / 2).toFixed(1) + '" y="' + padT + '" width="' + step.toFixed(1) +
+        '" height="' + plotH + '" fill="transparent" data-i="' + i + '" tabindex="0" role="img" ' +
+        'aria-label="' + U.esc(it.label + ': ' + U.hours(a) + ' ' + nameA + ', ' + U.hours(b) + ' ' + nameB) + '"/>';
+
+      if (i % everyN === 0) {
+        labels += '<text x="' + cx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" ' +
+          'font-size="10" fill="var(--ink-3)">' + U.esc(it.short || it.label) + '</text>';
+      }
+    });
+
+    el.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" class="colchart" aria-label="' +
+        U.esc(opt.aria || 'Biểu đồ cột theo ngày') + '">' +
+        g +
+        '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) +
+          '" y2="' + (padT + plotH) + '" stroke="var(--axis)" stroke-width="1"/>' +
+        bars + labels +
+      '</svg>' +
+      '<div class="chart-legend">' +
+        '<span class="legend-item"><i class="legend-swatch" style="background:' + colA + '"></i>' +
+          U.esc(nameA) + '</span>' +
+        '<span class="legend-item"><i class="legend-swatch" style="background:' + colB + '"></i>' +
+          U.esc(nameB) + '</span>' +
+      '</div>';
+
+    function tipFor(i) {
+      var it = items[i];
+      return '<b>' + U.esc(it.label) + '</b><br>' +
+        U.esc(nameA) + ': <b>' + U.hours(it.a || 0) + '</b> ' + unit + '<br>' +
+        U.esc(nameB) + ': <b>' + U.hours(it.b || 0) + '</b> ' + unit + '<br>' +
+        '<span style="opacity:.75">Tổng: ' + U.hours((it.a || 0) + (it.b || 0)) + ' ' + unit + '</span>';
+    }
+
+    U.$$('[data-i]', el).forEach(function (n) {
+      var i = Number(n.getAttribute('data-i'));
+      n.addEventListener('mousemove', function (e) { showTip(tipFor(i), e.clientX, e.clientY); });
+      n.addEventListener('mouseleave', hideTip);
+      n.addEventListener('focus', function () {
+        var r = n.getBoundingClientRect();
+        showTip(tipFor(i), r.left + r.width / 2, r.top);
+      });
+      n.addEventListener('blur', hideTip);
+    });
+  }
+
+  global.Charts = { bars: bars, donut: donut, columns: columns, hideTip: hideTip };
 })(window);

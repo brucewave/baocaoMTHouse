@@ -17,9 +17,9 @@
   var ASSETS = window.MTH_ASSETS || 'assets/';
 
   var STATUS = {
-    pending:  { label: 'Chờ duyệt', icon: 'clock',       cls: 'badge-pending' },
-    approved: { label: 'Đã duyệt',  icon: 'checkCircle', cls: 'badge-approved' },
-    rejected: { label: 'Từ chối',   icon: 'xCircle',     cls: 'badge-rejected' }
+    pending:  { label: 'Chờ xử lý',    icon: 'clock',       cls: 'badge-pending' },
+    approved: { label: 'Đã ghi nhận',  icon: 'checkCircle', cls: 'badge-approved' },
+    rejected: { label: 'Cần sửa lại',  icon: 'xCircle',     cls: 'badge-rejected' }
   };
 
   var NAV = [
@@ -333,13 +333,10 @@
   /* =========================================================
      KHUNG ỨNG DỤNG
      ========================================================= */
-  /** Quản lý: số báo cáo chờ duyệt. Nhân viên: số báo cáo bị trả lại cần sửa. */
+  /** Số báo cáo đang bị trả lại, cần người viết sửa. Đây là việc duy nhất còn phải xử lý. */
   function pendingCount() {
-    if (isAdmin()) {
-      return S.reports.filter(function (r) { return r.status === 'pending'; }).length;
-    }
     return S.reports.filter(function (r) {
-      return r.status === 'rejected' && r.employeeId === S.user.id;
+      return r.status === 'rejected' && (isAdmin() || r.employeeId === S.user.id);
     }).length;
   }
 
@@ -369,7 +366,7 @@
         var badge = '';
         if (it.id === 'list' && n) {
           badge = '<span class="nav-badge" aria-label="' + n +
-            (isAdmin() ? ' báo cáo chờ duyệt' : ' báo cáo bị trả lại cần sửa') + '">' + n + '</span>';
+            ' báo cáo cần sửa lại">' + n + '</span>';
         } else if (it.id === 'projects' && due) {
           badge = '<span class="nav-badge" aria-label="' + due + ' khách cần liên hệ">' + due + '</span>';
         }
@@ -496,17 +493,14 @@
    * Nhân viên không duyệt gì cả, nên chỉ nhắc những báo cáo bị trả lại cần sửa.
    */
   function pendingNote(month, employeeId) {
-    if (isAdmin()) {
-      var n = reportsIn({ month: month, employeeId: employeeId, status: 'pending' }).length;
-      if (!n) return '';
-      return '<p class="help no-print" style="margin:-8px 0 16px">' + U.icon('clock') +
-        ' Còn <b>' + n + ' báo cáo chờ duyệt</b> chưa được tính vào số liệu bên dưới. ' +
-        '<a href="#/list?status=pending&amp;month=' + encodeURIComponent(month) + '">Duyệt ngay</a></p>';
-    }
-    var r = reportsIn({ month: month, employeeId: S.user.id, status: 'rejected' }).length;
+    var r = reportsIn({
+      month: month,
+      employeeId: isAdmin() ? employeeId : S.user.id,
+      status: 'rejected'
+    }).length;
     if (!r) return '';
     return '<p class="help no-print" style="margin:-8px 0 16px;color:#A82F2F">' + U.icon('alert') +
-      ' Có <b>' + r + ' báo cáo bị trả lại</b> cần sửa rồi gửi lại. ' +
+      ' Có <b>' + r + ' báo cáo đang cần sửa lại</b> nên chưa tính vào số liệu bên dưới. ' +
       '<a href="#/list?status=rejected&amp;month=' + encodeURIComponent(month) + '">Xem ngay</a></p>';
   }
 
@@ -684,12 +678,12 @@
         '<span class="err" id="sd-err" hidden></span>' +
         '<div class="btn-row">' +
           '<button class="btn btn-primary btn-lg" type="button" data-submit>' + U.icon('send') + ' ' +
-            (editing ? 'Cập nhật &amp; gửi duyệt lại'
-                     : 'Gửi ' + d.rows.length + ' báo cáo') + '</button>' +
+            (editing ? 'Lưu thay đổi'
+                     : 'Gửi ' + d.rows.length + ' đầu việc') + '</button>' +
           (editing ? '<a class="btn btn-lg" href="#/list">Huỷ</a>' : '') +
         '</div>' +
-        '<p class="help" style="margin-top:10px">Mỗi dòng sẽ thành một báo cáo riêng, ở trạng thái ' +
-          '<b>Chờ duyệt</b> cho tới khi quản lý xác nhận.</p>' +
+        '<p class="help" style="margin-top:10px">Mỗi dòng sẽ thành một đầu việc riêng và được ' +
+          '<b>ghi nhận ngay</b>. Quản lý xem lại, nếu cần sẽ gửi yêu cầu sửa.</p>' +
       '</div></div>';
   }
 
@@ -701,8 +695,7 @@
         '<span class="wrow-n">' + (i + 1) + '</span>' +
         '<span class="wrow-title">' + U.esc(p ? p.name : 'Đầu việc ' + (i + 1)) + '</span>' +
         '<div class="grow"></div>' +
-        '<button class="btn btn-sm" type="button" data-img="' + r.id + '">' +
-          U.icon('image') + ' ' + (nImg ? nImg + ' ảnh' : 'Ảnh') + '</button>' +
+        (nImg ? '<span class="chip">' + U.icon('image') + nImg + ' ảnh</span>' : '') +
         (total > 1
           ? '<button class="btn btn-sm btn-danger" type="button" data-delrow="' + r.id + '" ' +
             'aria-label="Xoá đầu việc này">' + U.icon('trash') + '</button>'
@@ -745,24 +738,36 @@
 
       '<div class="wline2">' +
         '<div class="field w-desc"><label for="f-desc-' + r.id + '">Nội dung công việc <span class="req">*</span></label>' +
-          '<textarea class="textarea" rows="2" id="f-desc-' + r.id + '" data-f="description" data-r="' + r.id + '" ' +
-            'placeholder="Ví dụ: Triển khai bản vẽ nội thất chi tiết thi công tầng 2.">' +
-            U.esc(r.description) + '</textarea></div>' +
-        '<div class="field w-reason"><label for="f-reason-' + r.id + '">Lý do / mục tiêu</label>' +
-          '<input class="input" id="f-reason-' + r.id + '" data-f="reason" data-r="' + r.id + '" ' +
-            'value="' + U.esc(r.reason) + '" placeholder="Không bắt buộc"></div>' +
-      '</div>' +
+          '<input class="input" id="f-desc-' + r.id + '" data-f="description" data-r="' + r.id + '" ' +
+            'value="' + U.esc(r.description) + '" ' +
+            'placeholder="Ví dụ: Triển khai bản vẽ nội thất chi tiết thi công tầng 2."></div>' +
 
-      (nImg
-        ? '<div class="shots" style="margin-top:12px">' +
-            r.keep.map(function (im) {
-              return '<div class="shot" style="cursor:default"><img src="' + urlOf(im.blob) + '" alt=""></div>';
-            }).join('') +
-            r.imgs.map(function (im) {
-              return '<div class="shot" style="cursor:default"><img src="' + im.url + '" alt=""></div>';
-            }).join('') +
-          '</div>'
-        : '') +
+        '<div class="field w-img"><span class="field-label">Hình ảnh ' +
+            '<span class="opt">(không bắt buộc)</span></span>' +
+          '<div class="wdrop' + (pasteRow === r.id ? ' aim' : '') + '" data-aim="' + r.id + '" tabindex="0">' +
+            U.icon('upload') +
+            '<span class="wdrop-main">' +
+              (pasteRow === r.id ? 'Sẵn sàng — bấm Ctrl+V để dán ảnh' : 'Dán ảnh bằng Ctrl+V') + '</span>' +
+            '<span class="wdrop-sub">hoặc kéo thả vào đây · ' +
+              '<button type="button" class="wdrop-pick" data-pick="' + r.id + '">tải ảnh lên</button></span>' +
+            '<input type="file" accept="image/*" multiple hidden data-file="' + r.id + '">' +
+          '</div>' +
+          (nImg
+            ? '<div class="shots wshots">' +
+                r.keep.map(function (im, k) {
+                  return '<div class="shot" style="cursor:default"><img src="' + urlOf(im.blob) + '" alt="">' +
+                    '<button class="shot-del" type="button" data-rmkeep="' + r.id + ':' + k + '" ' +
+                    'aria-label="Gỡ ảnh">' + U.icon('x') + '</button></div>';
+                }).join('') +
+                r.imgs.map(function (im, k) {
+                  return '<div class="shot" style="cursor:default"><img src="' + im.url + '" alt="">' +
+                    '<button class="shot-del" type="button" data-rmnew="' + r.id + ':' + k + '" ' +
+                    'aria-label="Gỡ ảnh">' + U.icon('x') + '</button></div>';
+                }).join('') +
+              '</div>'
+            : '') +
+        '</div>' +
+      '</div>' +
     '</div>';
   }
 
@@ -858,6 +863,62 @@
       redraw();
     });
 
+    /* Bấm vào khung ảnh là ngắm dòng đó để Ctrl+V rơi đúng chỗ */
+    U.on(main, 'click', '[data-aim]', function (e, b) {
+      if (e.target.closest('[data-pick]')) return;
+      pasteRow = b.getAttribute('data-aim');
+      redraw();
+      var z = main.querySelector('[data-aim="' + pasteRow + '"]');
+      if (z) z.focus();
+    });
+
+    U.on(main, 'click', '[data-pick]', function (e, b) {
+      var id = b.getAttribute('data-pick');
+      pasteRow = id;
+      var f = main.querySelector('[data-file="' + id + '"]');
+      if (f) f.click();
+    });
+
+    main.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t.hasAttribute || !t.hasAttribute('data-file')) return;
+      var r = rowById(t.getAttribute('data-file'));
+      if (r) addRowImages(r, t.files).then(redraw);
+      t.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      main.addEventListener(ev, function (e) {
+        var z = e.target.closest && e.target.closest('[data-aim]');
+        if (!z) return;
+        e.preventDefault();
+        z.classList.add('over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      main.addEventListener(ev, function (e) {
+        var z = e.target.closest && e.target.closest('[data-aim]');
+        if (!z) return;
+        e.preventDefault();
+        z.classList.remove('over');
+        if (ev === 'drop' && e.dataTransfer) {
+          var r = rowById(z.getAttribute('data-aim'));
+          if (r) addRowImages(r, e.dataTransfer.files).then(redraw);
+        }
+      });
+    });
+
+    U.on(main, 'click', '[data-rmkeep]', function (e, b) {
+      var p = b.getAttribute('data-rmkeep').split(':');
+      var r = rowById(p[0]);
+      if (r) { r.keep.splice(Number(p[1]), 1); redraw(); }
+    });
+    U.on(main, 'click', '[data-rmnew]', function (e, b) {
+      var p = b.getAttribute('data-rmnew').split(':');
+      var r = rowById(p[0]);
+      if (r) { r.imgs.splice(Number(p[1]), 1); redraw(); }
+    });
+
     U.on(main, 'click', '[data-edith]', function (e, b) {
       var r = rowById(b.getAttribute('data-edith'));
       if (r) { r.manualHours = true; redraw(); }
@@ -871,12 +932,6 @@
       redraw();
     });
 
-    U.on(main, 'click', '[data-img]', function (e, b) {
-      var id = b.getAttribute('data-img');
-      pasteRow = id;
-      workImageDialog(rowById(id), redraw);
-    });
-
     U.on(main, 'click', '[data-submit]', function () { submitSend(ctx); });
   }
 
@@ -888,69 +943,6 @@
     var tc = sendDraft.rows.reduce(function (s, r) { return s + (Number(r.tc) || 0); }, 0);
     el.innerHTML = sendDraft.rows.length + ' đầu việc · <b>' + U.hours(hc) + '</b> giờ HC · <b>' +
       U.hours(tc) + '</b> giờ TC';
-  }
-
-  /** Hộp thoại ảnh của một đầu việc, dán được bằng Ctrl+V */
-  function workImageDialog(row, redraw) {
-    if (!row) return;
-    var el = U.openOverlay('<div class="dialog">' +
-      '<div class="dialog-head"><h3>Ảnh của đầu việc</h3>' +
-        '<button class="icon-btn" type="button" data-close aria-label="Đóng">' + U.icon('x') + '</button></div>' +
-      '<div class="dialog-body">' +
-        '<div class="dropzone" id="wi-dz" tabindex="0">' + U.icon('upload') +
-          '<p><b>Chụp bằng Snipping Tool rồi bấm Ctrl+V vào đây</b><br>' +
-          'hoặc kéo thả ảnh, hoặc chọn tệp</p>' +
-          '<div class="btn-row" style="justify-content:center;margin-top:10px">' +
-            '<button class="btn btn-sm" type="button" id="wi-pick">' + U.icon('image') + ' Chọn ảnh</button></div>' +
-          '<input type="file" id="wi-file" accept="image/*" multiple hidden></div>' +
-        '<div class="shots" id="wi-list" style="margin-top:14px"></div>' +
-      '</div>' +
-      '<div class="dialog-foot"><button class="btn btn-primary" type="button" data-close>Xong</button></div>' +
-    '</div>');
-
-    var listEl = U.$('#wi-list', el);
-
-    function refresh() {
-      var html = row.keep.map(function (im, i) {
-        return '<div class="shot" style="cursor:default"><img src="' + urlOf(im.blob) + '" alt="">' +
-          '<button class="shot-del" type="button" data-keep="' + i + '" aria-label="Gỡ ảnh">' +
-          U.icon('x') + '</button></div>';
-      }).join('') + row.imgs.map(function (im, i) {
-        return '<div class="shot" style="cursor:default"><img src="' + im.url + '" alt="">' +
-          '<button class="shot-del" type="button" data-new="' + i + '" aria-label="Gỡ ảnh">' +
-          U.icon('x') + '</button></div>';
-      }).join('');
-      listEl.innerHTML = html || '<p class="t-muted" style="font-size:13.5px">Chưa có ảnh nào.</p>';
-    }
-    refresh();
-
-    function take(files) { addRowImages(row, files).then(refresh).then(redraw); }
-
-    var dz = U.$('#wi-dz', el), fileEl = U.$('#wi-file', el);
-    U.$('#wi-pick', el).addEventListener('click', function () { fileEl.click(); });
-    fileEl.addEventListener('change', function () { take(fileEl.files); fileEl.value = ''; });
-    ['dragenter', 'dragover'].forEach(function (ev) {
-      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('over'); });
-    });
-    ['dragleave', 'drop'].forEach(function (ev) {
-      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('over'); });
-    });
-    dz.addEventListener('drop', function (e) { if (e.dataTransfer) take(e.dataTransfer.files); });
-
-    el.addEventListener('paste', function (e) {
-      if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) {
-        e.preventDefault();
-        e.stopPropagation();
-        take(e.clipboardData.files);
-      }
-    });
-
-    el.addEventListener('click', function (e) {
-      if (e.target.closest('[data-close]')) return U.closeOverlay();
-      var k = e.target.closest('[data-keep]'), n = e.target.closest('[data-new]');
-      if (k) { row.keep.splice(Number(k.getAttribute('data-keep')), 1); refresh(); redraw(); }
-      if (n) { row.imgs.splice(Number(n.getAttribute('data-new')), 1); refresh(); redraw(); }
-    });
   }
 
   /** Kiểm tra rồi lưu: mỗi dòng thành một báo cáo */
@@ -987,12 +979,13 @@
           projectId: r.projectId,
           categoryId: r.categoryId,
           description: String(r.description).trim(),
-          reason: String(r.reason).trim(),
+          reason: String(r.reason || '').trim(),
           timeFrom: r.timeFrom,
           timeTo: r.timeTo,
           hc: Number(r.hc) || 0,
           tc: Number(r.tc) || 0,
-          status: 'pending', reviewNote: '', reviewedBy: '', reviewedAt: 0
+          /* Không có bước duyệt: gửi lên là hệ thống ghi nhận ngay */
+          status: 'approved', reviewNote: '', reviewedBy: '', reviewedAt: Date.now()
         });
         return Store.saveReport(rec).then(function (rep) {
           var work = [];
@@ -1017,11 +1010,11 @@
 
     chain
       .then(function () {
-        U.toast(editing ? 'Đã cập nhật và gửi duyệt lại' : 'Đã gửi ' + saved + ' báo cáo, chờ quản lý duyệt', 'ok');
+        U.toast(editing ? 'Đã cập nhật báo cáo' : 'Đã ghi nhận ' + saved + ' đầu việc', 'ok');
         sendDraft = null; sendDraftKey = ''; pasteRow = null;
         return reload();
       })
-      .then(function () { go('list', { month: U.monthISO(d.date), status: 'pending' }); })
+      .then(function () { go('list', { month: U.monthISO(d.date) }); })
       .catch(function (err) { fail('Lỗi khi lưu: ' + err.message); });
   }
 
@@ -1038,10 +1031,10 @@
     var month = readMonth(q, '');
     var scopeEmp = isAdmin() ? (q.emp || '') : S.user.id;
 
-    /* Mở màn hình là thấy ngay việc cần xử lý. Nếu không còn gì chờ duyệt
-       thì hiện tất cả, tránh mở ra một trang trống. */
-    var hasPending = reportsIn({ employeeId: scopeEmp, status: 'pending' }).length > 0;
-    var curStatus = q.status === '_all' ? '_all' : (q.status || (hasPending ? 'pending' : '_all'));
+    /* Không còn bước duyệt nên mặc định hiện tất cả. Chỉ khi có báo cáo bị
+       trả lại thì mở sẵn nhóm đó vì đấy là việc duy nhất cần xử lý. */
+    var hasFix = reportsIn({ employeeId: scopeEmp, status: 'rejected' }).length > 0;
+    var curStatus = q.status === '_all' ? '_all' : (q.status || (hasFix ? 'rejected' : '_all'));
 
     var f = {
       month: month,
@@ -1053,7 +1046,7 @@
     var all = reportsIn(f).reverse();
     var LIMIT = 60;
     var rows = all.slice(0, LIMIT);
-    var nPending = reportsIn({ month: month, employeeId: f.employeeId, status: 'pending' }).length;
+    var nFix = reportsIn({ month: month, employeeId: f.employeeId, status: 'rejected' }).length;
     var scope = month ? U.monthVN(month) : 'Tất cả các tháng';
 
     main.innerHTML =
@@ -1061,12 +1054,10 @@
         '<div><h2>' + (isAdmin() ? 'Duyệt &amp; quản lý báo cáo' : 'Báo cáo của tôi') + '</h2>' +
         '<p>' + U.esc(scope) + ' · ' + all.length + ' báo cáo' +
           (curStatus !== '_all' ? ' ' + STATUS[curStatus].label.toLowerCase() : '') +
-          (nPending && curStatus === '_all'
-            ? ' · <b style="color:var(--st-warn)">' + nPending + ' chờ duyệt</b>' : '') + '</p></div>' +
+          (nFix && curStatus === '_all'
+            ? ' · <b style="color:#A82F2F">' + nFix + ' cần sửa lại</b>' : '') + '</p></div>' +
         '<div class="grow"></div>' +
-        (isAdmin() && nPending
-          ? '<button class="btn btn-good" id="btn-approve-all">' + U.icon('check') + ' Duyệt tất cả (' + nPending + ')</button>'
-          : '') +
+
         '<a class="btn btn-primary" href="#/send">' + U.icon('plus') + ' Báo cáo mới</a>' +
       '</div>' +
 
@@ -1112,30 +1103,12 @@
       });
     }
 
-    var approveAll = U.$('#btn-approve-all', main);
-    if (approveAll) approveAll.addEventListener('click', function () {
-      U.confirmDialog({
-        title: 'Duyệt tất cả',
-        message: 'Duyệt ' + nPending + ' báo cáo đang chờ' + (month ? ' trong ' + U.monthVN(month).toLowerCase() : ' (tất cả các tháng)') + '?',
-        okText: 'Duyệt tất cả'
-      }).then(function (ok) {
-        if (!ok) return;
-        var list = reportsIn({ month: month, employeeId: f.employeeId, status: 'pending' });
-        return Promise.all(list.map(function (r) {
-          r.status = 'approved'; r.reviewedBy = S.user.id; r.reviewedAt = Date.now(); r.reviewNote = '';
-          return Store.put('reports', r);
-        })).then(function () {
-          U.toast('Đã duyệt ' + list.length + ' báo cáo', 'ok');
-          return reload();
-        }).then(render);
-      });
-    });
   }
 
   function reportCard(r, imgs) {
     var st = STATUS[r.status] || STATUS.pending;
     var p = proj(r.projectId), c = cat(r.categoryId), e = emp(r.employeeId);
-    var canEdit = isAdmin() || (r.employeeId === S.user.id && r.status !== 'approved');
+    var canEdit = isAdmin() || r.employeeId === S.user.id;
 
     return '<article class="report is-' + r.status + '" data-id="' + r.id + '">' +
       '<div class="report-head">' +
@@ -1169,8 +1142,8 @@
       '</div>' +
 
       '<div class="report-actions">' +
-        (isAdmin() && r.status !== 'approved'
-          ? '<button class="btn btn-good btn-sm" data-act="approve">' + U.icon('check') + ' Duyệt</button>' : '') +
+        (isAdmin() && r.status === 'rejected'
+          ? '<button class="btn btn-good btn-sm" data-act="approve">' + U.icon('check') + ' Đã sửa xong</button>' : '') +
         (isAdmin() && r.status !== 'rejected'
           ? '<button class="btn btn-sm" data-act="reject">' + U.icon('x') + ' Yêu cầu sửa</button>' : '') +
         (canEdit ? '<button class="btn btn-sm" data-act="edit">' + U.icon('edit') + ' Sửa</button>' : '') +
@@ -1703,17 +1676,29 @@
           /* 2 — Hai bảng thông tin chung */
           sectionTables(agg) +
 
-          /* 3 — Biểu đồ */
-          '<div class="card" style="margin-top:20px"><div class="card-body"><div class="chart-grid">' +
-            '<figure class="chart-figure">' +
-              '<figcaption style="margin:0 0 12px;font-size:13.5px;font-weight:600;color:var(--ink)">' +
-                'Tổng thời gian theo công trình (giờ)</figcaption>' +
-              '<div class="chart" id="chart-proj"></div></figure>' +
-            '<figure class="chart-figure">' +
-              '<figcaption style="margin:0 0 12px;font-size:13.5px;font-weight:600;color:var(--ink)">' +
-                'Tỷ trọng thời gian theo hạng mục</figcaption>' +
-              '<div class="chart" id="chart-cat"></div></figure>' +
-          '</div></div></div>' +
+          /* 3 — Biểu đồ, tách theo nhiều chiều */
+          '<div class="card" style="margin-top:20px"><div class="card-body">' +
+            '<figure class="chart-figure chart-wide">' +
+              '<figcaption>Giờ công theo từng ngày trong tháng</figcaption>' +
+              '<div class="chart" id="chart-days"></div></figure>' +
+            '<div class="chart-grid" style="margin-top:22px">' +
+              '<figure class="chart-figure">' +
+                '<figcaption>Thời gian theo công trình (giờ)</figcaption>' +
+                '<div class="chart" id="chart-proj"></div></figure>' +
+              '<figure class="chart-figure">' +
+                '<figcaption>Tỷ trọng theo hạng mục</figcaption>' +
+                '<div class="chart" id="chart-cat"></div></figure>' +
+            '</div>' +
+            (single ? '' :
+              '<div class="chart-grid" style="margin-top:22px">' +
+                '<figure class="chart-figure">' +
+                  '<figcaption>Thời gian theo nhân viên (giờ)</figcaption>' +
+                  '<div class="chart" id="chart-emp"></div></figure>' +
+                '<figure class="chart-figure">' +
+                  '<figcaption>Giờ hành chính so với tăng ca theo nhân viên</figcaption>' +
+                  '<div class="chart" id="chart-ot"></div></figure>' +
+              '</div>') +
+          '</div></div>' +
 
           /* 4 — Phần chi tiết, gập lại cho đỡ rối */
           sectionDetails(agg) +
@@ -1748,6 +1733,45 @@
         return { label: c.name, value: U.round2(v.hc + v.tc), hex: c.hex };
       })
     });
+
+    /* Giờ công theo từng ngày — cho thấy ngày nào dồn việc, ngày nào tăng ca */
+    var byDay = {};
+    rows.forEach(function (r) {
+      if (!byDay[r.date]) byDay[r.date] = { hc: 0, tc: 0 };
+      byDay[r.date].hc += Number(r.hc) || 0;
+      byDay[r.date].tc += Number(r.tc) || 0;
+    });
+    Charts.columns(U.$('#chart-days', main), {
+      aria: 'Biểu đồ giờ công theo từng ngày trong tháng',
+      items: U.daysOfMonth(month).map(function (d) {
+        var v = byDay[d] || { hc: 0, tc: 0 };
+        return { label: U.weekdayVN(d) + ' ' + U.dayShort(d), short: d.slice(8), a: v.hc, b: v.tc };
+      })
+    });
+
+    if (!single) {
+      var eKeys = Object.keys(agg.byEmployee).sort(function (a, b) {
+        return (agg.byEmployee[b].hc + agg.byEmployee[b].tc) - (agg.byEmployee[a].hc + agg.byEmployee[a].tc);
+      });
+      Charts.bars(U.$('#chart-emp', main), {
+        unit: 'giờ',
+        aria: 'Biểu đồ tổng thời gian theo nhân viên',
+        items: eKeys.map(function (k) {
+          var v = agg.byEmployee[k];
+          return {
+            label: emp(k).name, value: U.round2(v.hc + v.tc),
+            parts: [{ name: 'Giờ HC', value: v.hc }, { name: 'Giờ TC', value: v.tc }]
+          };
+        })
+      });
+      Charts.columns(U.$('#chart-ot', main), {
+        aria: 'Biểu đồ giờ hành chính so với tăng ca theo nhân viên',
+        items: eKeys.map(function (k) {
+          var v = agg.byEmployee[k], name = emp(k).name.split(' ');
+          return { label: emp(k).name, short: name[name.length - 1], a: v.hc, b: v.tc };
+        })
+      });
+    }
 
     /* Thư viện ảnh */
     var withImg = rows.filter(function (r) { return r.imageCount; });

@@ -254,9 +254,27 @@
   /* =========================================================
      Khởi tạo
      ========================================================= */
+  /**
+   * Bỏ hẳn bước duyệt: nhân viên gửi là hệ thống ghi nhận luôn.
+   * Những báo cáo cũ còn ở trạng thái chờ duyệt được chuyển thành đã ghi nhận.
+   */
+  function dropPendingStatus() {
+    return all('reports').then(function (rows) {
+      var stuck = rows.filter(function (r) { return r.status === 'pending'; });
+      if (!stuck.length) return;
+      stuck.forEach(function (r) {
+        r.status = 'approved';
+        r.reviewedAt = r.reviewedAt || Date.now();
+      });
+      return putMany('reports', stuck);
+    });
+  }
+
   /** Vá dữ liệu cũ khi nâng cấp: thêm tên đăng nhập, mật khẩu, giai đoạn công trình */
   function migrate() {
-    return Promise.all([all('employees'), all('projects')]).then(function (r) {
+    return dropPendingStatus().then(function () {
+      return Promise.all([all('employees'), all('projects')]);
+    }).then(function (r) {
       var used = {};
       var emps = r[0].map(function (e) {
         if (!e.password) e.password = e.pin || '123456';
